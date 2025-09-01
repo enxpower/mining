@@ -31,6 +31,14 @@
   .stack{position:relative}
   footer{margin-top:14px;padding-top:10px;border-top:1px dashed #e5e7eb;color:#6b7280;font-size:12px;display:flex;gap:14px;flex-wrap:wrap}
   footer a{color:#2563eb;text-decoration:none}
+
+  /* ✅ 防抖动：固定 live 行高 + 禁止换行 + 省略号 */
+  #live{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    min-height:1.5em;
+  }
 </style>
 </head>
 <body>
@@ -369,8 +377,6 @@ function fuelLH(fleet){
 
 /* —— 动态节油对照：全柴油最优近似 —— */
 function baselineFuelLitersPerHour(Pload){
-  // 用与现场一致的机组规格，但忽略爬坡/启停延时；
-  // 以“尽量接近 0.65~0.75 pu”的均匀负载分配近似最省油。
   const units=[];
   for(let i=0;i<6;i++) units.push({cap:3.3});
   for(let i=0;i<2;i++) units.push({cap:1.25});
@@ -378,7 +384,6 @@ function baselineFuelLitersPerHour(Pload){
 
   if(Pload<=0) return 0;
 
-  // 按容量从大到小，逐步加入，直至满足 Pload 且单机负载率落在[0.35,0.9]
   units.sort((a,b)=>b.cap-a.cap);
   let chosen=[];
   let sumCap=0;
@@ -391,14 +396,11 @@ function baselineFuelLitersPerHour(Pload){
     if(sumCap>=Pload && per<=0.9) break;
   }
 
-  // 若仍不足，则全部用上
   if(sumCap<Pload){ /* 所有机组都上 */ }
 
-  // 均匀分配并满足最低负载
   const n=chosen.length;
   let per=Math.max(Pload/sumCap, minPu);
   per=Math.min(per, 0.95);
-  // 尽量靠近 targetPu
   per = clamp(Math.max(per, targetPu-0.1), minPu, 0.95);
 
   let Lh=0, rho=0.84;
@@ -409,11 +411,10 @@ function baselineFuelLitersPerHour(Pload){
     const kgph=(sfc_g_per_kWh(pu)/1000)*kW;
     Lh += kgph/rho;
   }
-  // 如果 Pload 比 sumCap*per 大（极端情况），把超额按最高 SFC 估算
   const supplied = chosen.reduce((a,x)=>a+per*x.cap,0);
   if(Pload>supplied){
     const extraKW=(Pload-supplied)*1000;
-    const kgph=(200/1000)*extraKW; // 200 g/kWh 粗略
+    const kgph=(200/1000)*extraKW;
     Lh += kgph/rho;
   }
   return Lh; // L/h

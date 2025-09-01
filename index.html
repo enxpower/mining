@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>离网矿区 光储柴（35kV母线）仿真：Diesel=VF, BESS=VSG</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:16px;color:#111}
+  h1{font-size:18px;margin:0 0 8px}
+  .row{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0}
+  .card{border:1px solid #ddd;border-radius:8px;padding:12px;flex:1 1 320px}
+  label{display:block;font-size:12px;margin:6px 0 2px}
+  input,select{width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:6px}
+  .btn{padding:8px 12px;border:1px solid #333;border-radius:6px;background:#fff;cursor:pointer}
+  .btn:active{transform:translateY(1px)}
+  canvas{width:100%;height:260px;background:#fff;border:1px solid #eee;border-radius:6px}
+  small{color:#666}
+  .pill{display:inline-block;border:1px solid #bbb;border-radius:999px;padding:2px 8px;margin-right:6px;font-size:12px}
+  .kv{font-family:ui-monospace,Menlo,Consolas,monospace}
+</style>
+</head>
+<body>
+<h1>Off-Grid Mining Microgrid @ <span class="kv">35 kV</span> Bus — <span class="pill">Diesel = VF</span><span class="pill">BESS = VSG</span><span class="pill">PV = Grid-Following</span></h1>
+<div class="row">
+  <div class="card">
+    <b>全局与时间轴</b>
+    <label>仿真步长 dt（秒）</label><input id="dt" type="number" value="0.5" step="0.1">
+    <label>总时长（分钟）</label><input id="simMins" type="number" value="60" step="5">
+    <label>名义频率（Hz）</label><input id="f0" type="number" value="60" step="1">
+    <label>名义电压（kV，仅展示）</label><input id="v0" type="number" value="35" step="1">
+    <div style="margin-top:8px">
+      <button class="btn" id="startBtn">▶ 开始</button>
+      <button class="btn" id="pauseBtn">⏸ 暂停</button>
+      <button class="btn" id="resetBtn">↺ 重置</button>
+    </div>
+    <div style="margin-top:8px"><small>说明：频率随“发电合计 − 负载”的不平衡由 VSG 虚拟惯量 + 柴油机下垂共同调节。</small></div>
+  </div>
+
+  <div class="card">
+    <b>负载与 PV</b>
+    <label>连续负载（MW）</label><input id="Pload" type="number" value="12" step="0.5">
+    <label>PV 装机上限 P<sub>PV,max</sub>（MW）</label><input id="PpvMax" type="number" value="15" step="1">
+    <label>PV 曲线：云影扰动强度（0–1）</label><input id="pvCloud" type="number" value="0.35" min="0" max="1" step="0.05">
+    <label>PV 曲线：日形曲线凸显（1–3）</label><input id="pvShape" type="number" value="1.6" min="1" max="3" step="0.1">
+  </div>
+
+  <div class="card">
+    <b>柴油机（VF）</b>
+    <label>3.3 MW 机组并机台数（0–6）</label><input id="dg33n" type="number" value="3" min="0" max="6" step="1">
+    <label>1.25 MW 机组并机台数（0–2）</label><input id="dg12n" type="number" value="0" min="0" max="2" step="1">
+    <label>调速器有功下垂 R<sub>dg</sub>（%）</label><input id="Rdg" type="number" value="4" step="0.5">
+    <label>柴油爬坡限（MW/s）</label><input id="rampDg" type="number" value="0.2" step="0.05">
+    <label>单台最低负载（pu，避免湿堆）</label><input id="dgMinPu" type="number" value="0.3" step="0.05">
+  </div>
+
+  <div class="card">
+    <b>储能（VSG）</b>
+    <label>BESS 额定功率 P<sub>BESS,max</sub>（MW）</label><input id="PbMax" type="number" value="6" step="0.5">
+    <label>BESS 能量 E<sub>max</sub>（MWh）</label><input id="EbMax" type="number" value="15" step="1">
+    <label>初始 SOC（%）</label><input id="soc0" type="number" value="60" min="5" max="95" step="1">
+    <label>VSG 虚拟惯量 H（s）</label><input id="Hvsg" type="number" value="2.0" step="0.1">
+    <label>VSG 有功下垂 R<sub>vsg</sub>（%）</label><input id="Rvsg" type="number" value="3" step="0.5">
+  </div>
+</div>
+
+<div class="row">
+  <div class="card" style="flex:2 1 480px">
+    <b>功率（MW）</b>
+    <canvas id="pPlot"></canvas>
+    <div><small>展示：PV（黄）、Load（黑）、Diesel（蓝）、BESS（绿，放电为正，充电为负）。</small></div>
+  </div>
+  <div class="card" style="flex:1 1 320px">
+    <b>频率（Hz）与 SOC（%）</b>
+    <canvas id="fPlot"></canvas>
+    <div class="kv" id="liveReadout" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<div class="card">
+  <b>模型说明（简化）</b>
+  <ul>
+    <li>母线额定 <b>35 kV</b>；频率名义 <b>60 Hz</b>。柴油机等效为 <b>VF 源</b>，提供基准；BESS 以 <b>VSG</b> 形式参与稳频，提供虚拟惯量与下垂支撑。</li>
+    <li>频率动态：<code>df/dt ≈ (P_gen − P_load) / (2·H_tot·S_base)</code>，其中 H_tot 来自 VSG 虚拟惯量 + 柴油等效惯量（简化为常数）。</li>
+    <li>柴油功率由调速器下垂 + 爬坡限响应频差，限幅于可并机容量与单机最小负载；BESS 依据 VSG 下垂快速调节，受功率与 SOC 约束。</li>
+    <li>PV 采用“日形曲线 × 云影扰动”，可通过参数调整装机与波动强度。</li>
+  </ul>
+</div>
+
+<script>
+(function(){
+  // ==== Utilities ====
+  const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+
+  // ==== DOM ====
+  const els = {
+    dt: document.getElementById('dt'),
+    simMins: document.getElementById('simMins'),
+    f0: document.getElementById('f0'),
+    v0: document.getElementById('v0'),
+    Pload: document.getElementById('Pload'),
+    PpvMax: document.getElementById('PpvMax'),
+    pvCloud: document.getElementById('pvCloud'),
+    pvShape: document.getElementById('pvShape'),
+    dg33n: document.getElementById('dg33n'),
+    dg12n: document.getElementById('dg12n'),
+    Rdg: document.getElementById('Rdg'),
+    rampDg: document.getElementById('rampDg'),
+    dgMinPu: document.getElementById('dgMinPu'),
+    PbMax: document.getElementById('PbMax'),
+    EbMax: document.getElementById('EbMax'),
+    soc0: document.getElementById('soc0'),
+    Hvsg: document.getElementById('Hvsg'),
+    Rvsg: document.getElementById('Rvsg'),
+    startBtn: document.getElementById('startBtn'),
+    pauseBtn: document.getElementById('pauseBtn'),
+    resetBtn: document.getElementById('resetBtn'),
+    pPlot: document.getElementById('pPlot'),
+    fPlot: document.getElementById('fPlot'),
+    liveReadout: document.getElementById('liveReadout'),
+  };
+
+  // ==== Canvas setup ====
+  const pctx = els.pPlot.getContext('2d');
+  const fctx = els.fPlot.getContext('2d');
+
+  let running=false, t=0, data=[];
+  let state = {};
+
+  function initState(){
+    const Sbase = 20; // MW, 标幺基准（可调）
+    const f0 = parseFloat(els.f0.value);
+    const EbMax = parseFloat(els.EbMax.value);
+    const soc0 = parseFloat(els.soc0.value)/100;
+    const Hdg = 1.0; // 柴油等效惯量常数（简化）
+    state = {
+      Sbase,
+      f0,
+      f: f0,
+      V: parseFloat(els.v0.value),
+      Pload: parseFloat(els.Pload.value),
+      pv: { Pmax: parseFloat(els.PpvMax.value), cloud: parseFloat(els.pvCloud.value), shape: parseFloat(els.pvShape.value) },
+      dg: {
+        n33: parseInt(els.dg33n.value,10),
+        n12: parseInt(els.dg12n.value,10),
+        P: 0,
+        Pmax: ()=> (3.3*parseInt(els.dg33n.value,10) + 1.25*parseInt(els.dg12n.value,10)),
+        Rdg: parseFloat(els.Rdg.value)/100, // pu/pu
+        ramp: parseFloat(els.rampDg.value),
+        minPu: parseFloat(els.dgMinPu.value),
+        Hdg
+      },
+      bess: {
+        PbMax: parseFloat(els.PbMax.value),
+        EbMax,
+        E: EbMax * soc0, // MWh
+        H: parseFloat(els.Hvsg.value),
+        R: parseFloat(els.Rvsg.value)/100, // pu/pu
+        P: 0 // MW
+      }
+    };
+    data = [];
+    t = 0;
+  }
+
+  function pvProfile(t, T){
+    // 太阳日形 + 云影随机：输出 ∈ [0, Pmax]
+    const Pmax = state.pv.Pmax;
+    const shape = state.pv.shape; // 1~3
+    const cloud = state.pv.cloud; // 0~1
+    const x = Math.sin(Math.PI * (t/T)); // [0..π]
+    const day = Math.max(0, x) ** shape;
+    // 云影：平滑噪声
+    const clouds = 0.5 + 0.5*Math.sin(0.05*t) * 0.6 + 0.4*Math.sin(0.013*t+1.7);
+    const factor = clamp( (1 - cloud) + cloud*clouds, 0, 1);
+    return Pmax * day * factor;
+  }
+
+  function step(){
+    const dt = parseFloat(els.dt.value);
+    const f0 = state.f0;
+    const Pload = state.Pload;
+
+    // PV
+    const Tsim = parseFloat(els.simMins.value)*60;
+    const Ppv = pvProfile(t, Tsim);
+
+    // Diesel capacity & min load
+    const PdgMax = state.dg.Pmax();
+    const minPerUnit = state.dg.minPu;
+    const minP = PdgMax>0 ? minPerUnit * (PdgMax / Math.max(1,(state.dg.n33+state.dg.n12))) : 0; // 每台最低负载聚合近似
+    // 频差
+    const df = (state.f - f0);
+    const fpu = df / f0; // per-unit frequency deviation
+
+    // Diesel droop control (slower, with ramp)
+    const Pd_ref = clamp( Pload - Ppv, 0, PdgMax ); // 目标：承担基荷（很简化）
+    // 下垂按频差修正（频率低→多发；高→少发）
+    const dDroop = - fpu / Math.max(0.001, state.dg.Rdg) * (PdgMax);
+    let Pd_cmd = clamp(Pd_ref + dDroop, 0, PdgMax);
+    // 单机最小负载近似：若有并机，避免把合计功率压太低
+    Pd_cmd = Math.max(Pd_cmd, Math.min(minP*(state.dg.n33+state.dg.n12), PdgMax));
+
+    // 爬坡限
+    const dPd = clamp(Pd_cmd - state.dg.P, -state.dg.ramp*dt, state.dg.ramp*dt);
+    state.dg.P = clamp(state.dg.P + dPd, 0, PdgMax);
+
+    // BESS VSG：快速下垂（频率低→放电，高→充电），受功率&能量限制
+    const Pb_free = state.bess.PbMax;
+    const Pb_droop = clamp( - fpu / Math.max(0.001,state.bess.R) * (state.bess.PbMax), -Pb_free, Pb_free );
+    // 优先用于平衡：目标使 P_gen ≈ P_load
+    const Pimb = (state.dg.P + Ppv + state.bess.P) - Pload;
+    // 强化纠偏：抵消不平衡
+    const Pb_correction = clamp( -Pimb, -Pb_free, Pb_free );
+    // 组合（权重）：快速平衡优先，其次下垂
+    let Pb_cmd = clamp( 0.7*Pb_correction + 0.3*Pb_droop, -Pb_free, Pb_free );
+
+    // 能量&SOC限制
+    const E = state.bess.E; const EbMax = state.bess.EbMax;
+    const SOC = clamp(E / EbMax, 0, 1);
+    // 若 SOC 低，限制放电；若 SOC 高，限制充电
+    const socSoft = 0.1; // 软限制带宽
+    if (SOC < socSoft) Pb_cmd = Math.min(Pb_cmd, 0); // 只充不放
+    if (SOC > 1-socSoft) Pb_cmd = Math.max(Pb_cmd, 0); // 只放不充
+    // 更新 BESS 功率
+    state.bess.P = clamp(Pb_cmd, -Pb_free, Pb_free);
+
+    // 频率动力学（VSG 虚拟惯量 + 柴油惯量）：df/dt = ΔP / (2*H_tot*Sbase)
+    const Htot = state.bess.H + state.dg.Hdg; // 简化聚合
+    const Pinj = (state.dg.P + Ppv + state.bess.P) - Pload; // MW
+    const dfdt = (Pinj) / (2 * Math.max(0.2,Htot) * state.Sbase) * f0; // 近似缩放
+    state.f += dfdt * dt;
+
+    // 能量更新（MWh）
+    state.bess.E = clamp( state.bess.E - state.bess.P * dt/3600, 0, state.bess.EbMax);
+
+    // 记录
+    data.push({
+      t, Ppv, Pload, Pdg: state.dg.P, Pb: state.bess.P, f: state.f, soc: 100*state.bess.E/state.bess.EbMax
+    });
+    t += dt;
+  }
+
+  // ==== Plotting ====
+  function drawSeries(ctx, w, h, xs, ys, color){
+    ctx.beginPath();
+    for(let i=0;i<xs.length;i++){
+      const x = xs[i], y = ys[i];
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = color; ctx.lineWidth=2; ctx.stroke();
+  }
+
+  function plotPower(){
+    const w = els.pPlot.width = els.pPlot.clientWidth * devicePixelRatio;
+    const h = els.pPlot.height = els.pPlot.clientHeight * devicePixelRatio;
+    pctx.clearRect(0,0,w,h);
+    const N = data.length;
+    if(N<2) return;
+    // X: time
+    const xmin = data[0].t, xmax = data[N-1].t;
+    const xs = data.map(d => (d.t - xmin)/(xmax - xmin || 1) * (w-40) + 30);
+    // Y: power (MW)
+    const allP = data.flatMap(d=>[d.Ppv, d.Pload, d.Pdg, d.Pb]);
+    const pmin = Math.min(0, ...allP), pmax = Math.max(...allP, 1);
+    const ymap = v => (1 - (v - pmin)/(pmax - pmin || 1))*(h-30) + 15;
+    // grid
+    pctx.strokeStyle = '#eee'; pctx.lineWidth=1;
+    for(let i=0;i<5;i++){
+      const y = lerp(15,h-15,i/4);
+      pctx.beginPath(); pctx.moveTo(30,y); pctx.lineTo(w-10,y); pctx.stroke();
+    }
+    // series
+    drawSeries(pctx,w,h,xs,data.map(d=>ymap(d.Ppv)),'#d4a106'); // PV
+    drawSeries(pctx,w,h,xs,data.map(d=>ymap(d.Pload)),'#111');  // Load
+    drawSeries(pctx,w,h,xs,data.map(d=>ymap(d.Pdg)),'#1f6feb'); // Diesel
+    drawSeries(pctx,w,h,xs,data.map(d=>ymap(d.Pb)),'#14866d');  // BESS
+    // legend
+    pctx.fillStyle='#111'; pctx.font = `${12*devicePixelRatio}px sans-serif`;
+    pctx.fillText('MW', 6, 16*devicePixelRatio);
+    const leg = [['PV','#d4a106'],['Load','#111'],['Diesel','#1f6feb'],['BESS','#14866d']];
+    leg.forEach((L,i)=>{
+      pctx.fillStyle = L[1]; pctx.fillRect(40+i*90, 10, 20, 6);
+      pctx.fillStyle = '#333'; pctx.fillText(L[0], 64+i*90, 16);
+    });
+  }
+
+  function plotFreq(){
+    const w = els.fPlot.width = els.fPlot.clientWidth * devicePixelRatio;
+    const h = els.fPlot.height = els.fPlot.clientHeight * devicePixelRatio;
+    fctx.clearRect(0,0,w,h);
+    const N = data.length;
+    if(N<2) return;
+    const xmin = data[0].t, xmax = data[N-1].t;
+    const xs = data.map(d => (d.t - xmin)/(xmax - xmin || 1) * (w-40) + 30);
+    const f0 = state.f0;
+    const fVals = data.map(d=>d.f);
+    const socVals = data.map(d=>d.soc);
+    const fmin = Math.min(...fVals, f0-1), fmax = Math.max(...fVals, f0+1);
+    const ymapF = v => (1 - (v - fmin)/(fmax - fmin || 1))*(h-30) + 15;
+    const yminS = 0, ymaxS = 100;
+    const ymapS = v => (1 - (v - yminS)/(ymaxS - yminS || 1))*(h-30) + 15;
+
+    // grid
+    fctx.strokeStyle = '#eee'; fctx.lineWidth=1;
+    for(let i=0;i<5;i++){
+      const y = lerp(15,h-15,i/4);
+      fctx.beginPath(); fctx.moveTo(30,y); fctx.lineTo(w-10,y); fctx.stroke();
+    }
+    // freq
+    drawSeries(fctx,w,h,xs,fVals.map(ymapF),'#e5534b');
+    // SOC
+    drawSeries(fctx,w,h,xs,socVals.map(ymapS),'#0f766e');
+
+    // legend
+    fctx.fillStyle='#333'; fctx.font = `${12*devicePixelRatio}px sans-serif`;
+    fctx.fillText('Frequency & SOC', 8, 16*devicePixelRatio);
+    fctx.fillStyle='#e5534b'; fctx.fillRect(40, 10, 20, 6);
+    fctx.fillStyle='#333'; fctx.fillText('f (Hz)', 64, 16);
+    fctx.fillStyle='#0f766e'; fctx.fillRect(120, 10, 20, 6);
+    fctx.fillStyle='#333'; fctx.fillText('SOC (%)', 144, 16);
+
+    // live readout
+    const last = data[data.length-1];
+    els.liveReadout.innerHTML =
+      `t=${last.t.toFixed(1)} s · f=${last.f.toFixed(3)} Hz · `+
+      `PV=${last.Ppv.toFixed(2)} MW · Diesel=${last.Pdg.toFixed(2)} MW · `+
+      `BESS=${last.Pb.toFixed(2)} MW · SOC=${last.soc.toFixed(1)}% · Load=${last.Pload.toFixed(2)} MW`;
+  }
+
+  function loop(){
+    if(!running) return;
+    step();
+    plotPower(); plotFreq();
+    requestAnimationFrame(loop);
+  }
+
+  // ==== Buttons ====
+  els.startBtn.onclick = ()=>{
+    if(!running){
+      if(data.length===0) initState();
+      running = true; requestAnimationFrame(loop);
+    }
+  };
+  els.pauseBtn.onclick = ()=>{ running=false; };
+  els.resetBtn.onclick = ()=>{
+    running=false; initState(); plotPower(); plotFreq();
+  };
+
+  // init
+  initState(); plotPower(); plotFreq();
+})();
+</script>
+</body>
+</html>

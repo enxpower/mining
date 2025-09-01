@@ -1,10 +1,10 @@
-# Create the full V2 interactive single-file HTML simulation
-html_v2 = r"""<!DOCTYPE html>
+# Build the corrected V2.1 HTML (frequency scaling, renewable % calc, diesel logic tweaks) and save it
+html_v21 = r"""<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>离网矿区光储柴仿真 V2 — 35kV母线 | Diesel=VF · BESS=VSG · PV曲线</title>
+<title>离网矿区光储柴仿真 V2.1 — 35kV母线 | Diesel=VF · BESS=VSG · PV曲线</title>
 <style>
   :root { --fg:#111; --muted:#666; --line:#e5e7eb; --box:#d1d5db; --ok:#047857; --warn:#d97706; --bad:#b91c1c; }
   * { box-sizing: border-box; }
@@ -21,8 +21,6 @@ html_v2 = r"""<!DOCTYPE html>
   .btn.group { margin-right:6px; }
   .pill { display:inline-block; border:1px solid #cbd5e1; border-radius:999px; padding:2px 8px; margin-right:6px; font-size:12px; }
   .kv { font-family: ui-monospace, Menlo, Consolas, monospace; }
-  .grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
-  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
   canvas { width:100%; height:260px; background:#fff; border:1px solid #eee; border-radius:10px; }
   .kpi { display:flex; gap:14px; flex-wrap:wrap; }
   .kpi .box { border:1px solid var(--box); border-radius:10px; padding:8px 10px; min-width: 150px; }
@@ -32,13 +30,12 @@ html_v2 = r"""<!DOCTYPE html>
   .ok { color: var(--ok); border-color: var(--ok); }
   .warn { color: var(--warn); border-color: var(--warn); }
   .bad { color: var(--bad); border-color: var(--bad); }
-  .muted { color: var(--muted); }
   .note { font-size:12px; color:#374151; }
 </style>
 </head>
 <body>
 <h1>Off-Grid Mining Microgrid @ <span class="kv">35 kV</span> Bus — <span class="pill">Diesel = VF</span><span class="pill">BESS = VSG</span><span class="pill">PV = Grid-Following</span></h1>
-<div class="sub">V2 模拟：机组群调度（整数台）、VSG虚拟惯量与下垂、SOC能量环、启停延时、N−1校核、油耗估算、场景预设（极寒/沙漠/高海拔）。</div>
+<div class="sub">V2.1 修正：频率缩放修复（ΔP→pu后计算）、可再生占比不超100%、绿电能量追踪、柴油初始化与分配更稳健。</div>
 
 <div class="row">
   <div class="card">
@@ -51,13 +48,7 @@ html_v2 = r"""<!DOCTYPE html>
       <button class="btn group secondary" id="pauseBtn">⏸ 暂停</button>
       <button class="btn group secondary" id="resetBtn">↺ 重置</button>
     </div>
-    <div style="margin-top:10px">
-      <button class="btn group" id="presetArctic">❄ 极寒</button>
-      <button class="btn group" id="presetDesert">☀ 沙漠</button>
-      <button class="btn group" id="presetHigh">⛰ 高海拔</button>
-      <button class="btn group secondary" id="presetDefault">⟲ 默认</button>
-    </div>
-    <div class="note" style="margin-top:8px">频率由 <b>发电合计 − 负载</b> 的不平衡驱动；BESS（VSG）提供虚拟惯量与快速下垂，柴油机为VF源带慢响应与爬坡限。</div>
+    <div class="note" style="margin-top:8px">频率随 <b>ΔP = (Pdg + Ppv + Pb − Pload)</b> 的不平衡变化；BESS（VSG）提供虚拟惯量 + 下垂快环，柴油提供慢环与爬坡。</div>
   </div>
 
   <div class="card">
@@ -111,32 +102,29 @@ html_v2 = r"""<!DOCTYPE html>
   <b>运行指标（累计）</b>
   <div class="kpi" id="kpiRow">
     <div class="box"><b>燃油消耗</b><span id="kpiFuel">0 L</span></div>
-    <div class="box"><b>可再生占比（PV+绿电）</b><span id="kpiRE">0%</span></div>
+    <div class="box"><b>可再生占比（PV 直接 + BESS绿电）</b><span id="kpiRE">0%</span></div>
     <div class="box"><b>弃光</b><span id="kpiCurt">0 MWh</span></div>
     <div class="box"><b>N−1 校核</b><span id="kpiN1"><span class="flag ok">OK</span></span></div>
     <div class="box"><b>电能质量占位（THDv目标≤5%）</b><span id="kpiTHD"><span class="flag ok">OK</span></span></div>
   </div>
-  <div class="sub">说明：燃油基于典型SFC曲线估算；“绿电”追踪由PV充入电池并再放出的能量；THD为占位指示，真实工程应由PQ表/PCS上传数据。</div>
+  <div class="sub">说明：燃油基于典型SFC曲线估算；“BESS绿电”仅统计由PV充入并最终放给负载的部分（不重复计入）；THD 为占位示意。</div>
 </div>
 
 <div class="card">
   <b>模型与互锁（摘要）</b>
   <ul class="sub">
-    <li>频率动力学近似：<code>df/dt ≈ ΔP / (2·H_tot·S_base) · f0</code>；<b>H_tot</b> 来自 VSG 虚拟惯量 + 柴油等效惯量。</li>
+    <li>频率动力学：<code>ΔP_pu = ΔP / S_base</code>；<code>df/dt = (ΔP_pu / (2·H_tot)) · f0</code>；<b>H_tot</b> = VSG虚拟惯量 + 柴油等效惯量。</li>
     <li>柴油：VF成网，调速下垂、爬坡限、单机最小负载、整数台启停、启停延时、N−1 校核。</li>
     <li>BESS：VSG下垂 + 虚拟惯量；双环控制：快速频率环 + 能量回正（SOC→目标窗）。</li>
-    <li>PV：日形×云影×污染系数，具斜率自然限制；超出负荷与充电能力时计入弃光。</li>
-    <li>互锁样例：频率越限或SOC过低时冻结减机；N−1不满足时强制并机；若禁止Diesel-Off则至少1台在网。</li>
+    <li>PV：日形×云影×污染系数；“直接供负载”与“充电”分开核算，避免 RE% 超100%。</li>
   </ul>
 </div>
 
 <script>
 (function(){
-  // ---------- Helpers ----------
   const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
   const lerp=(a,b,t)=>a+(b-a)*t;
   const fmt=(v,unit)=> v.toLocaleString(undefined,{maximumFractionDigits: (Math.abs(v)<10?2:1)}) + (unit?(" "+unit):"");
-  const rand=()=>Math.random();
 
   // DOM
   const el = (id)=>document.getElementById(id);
@@ -149,16 +137,13 @@ html_v2 = r"""<!DOCTYPE html>
     PbMax: el('PbMax'), EbMax: el('EbMax'), soc0: el('soc0'), Hvsg: el('Hvsg'), Rvsg: el('Rvsg'),
     socTarget: el('socTarget'), socBand: el('socBand'),
     startBtn: el('startBtn'), pauseBtn: el('pauseBtn'), resetBtn: el('resetBtn'),
-    presetArctic: el('presetArctic'), presetDesert: el('presetDesert'), presetHigh: el('presetHigh'), presetDefault: el('presetDefault'),
-    pPlot: el('pPlot'), fPlot: el('fPlot'),
-    live: el('live'),
+    pPlot: el('pPlot'), fPlot: el('fPlot'), live: el('live'),
     kpiFuel: el('kpiFuel'), kpiRE: el('kpiRE'), kpiCurt: el('kpiCurt'), kpiN1: el('kpiN1'), kpiTHD: el('kpiTHD')
   };
-
   const pctx = els.pPlot.getContext('2d');
   const fctx = els.fPlot.getContext('2d');
 
-  // ---------- State ----------
+  // State
   let running=false, t=0, series=[];
   let st={};
 
@@ -166,409 +151,284 @@ html_v2 = r"""<!DOCTYPE html>
     const f0 = +els.f0.value;
     const EbMax = +els.EbMax.value;
     const soc0 = (+els.soc0.value)/100;
+    // base apparent system size, pick 30MW as nominal
     st = {
-      Sbase: 30, // MW，标幺参考
-      f0, f: f0,
-      // PV
-      pv: { Pmax:+els.PpvMax.value, shape:+els.pvShape.value, cloud:+els.pvCloud.value, soil:+els.pvSoil.value, curtWh:0 },
-      // Load
+      Sbase: 30, f0, f: f0,
+      pv: { Pmax:+els.PpvMax.value, shape:+els.pvShape.value, cloud:+els.pvCloud.value, soil:+els.pvSoil.value,
+            curtWh:0, E_direct:0 },
       load: { base:+els.Pload.value, var:+els.loadVar.value },
-      // Diesel fleet
       dg: {
-        units: [], // [{cap, type, online, P, timer, starting, stopping}]
-        Rdg:(+els.Rdg.value)/100, ramp:+els.rampDg.value, minPu:+els.dgMinPu.value,
-        delay:+els.dgDelay.value, allowOff: (els.allowDieselOff.value==="true"),
-        HperMW: 0.03 // 等效惯量（s/MW）简化
+        units: [], Rdg:(+els.Rdg.value)/100, ramp:+els.rampDg.value, minPu:+els.dgMinPu.value,
+        delay:+els.dgDelay.value, allowOff:(els.allowDieselOff.value==="true"),
+        HperMW: 0.03
       },
-      // BESS (VSG)
-      bess: {
-        Pmax:+els.PbMax.value, Emax:EbMax, E:EbMax*soc0,
-        H:+els.Hvsg.value, R:(+els.Rvsg.value)/100,
-        socTarget:(+els.socTarget.value)/100, socBand:(+els.socBand.value)/100,
-        P:0, greenStore: 0 // 追踪“绿电”库存
-      },
-      // KPIs
-      fuelL:0, // 升
-      E_pv:0, E_load:0, E_greenOut:0,
-      curtWh:0,
-      // internal
-      n1_ok:true, thd_ok:true,
+      bess: { Pmax:+els.PbMax.value, Emax:EbMax, E:EbMax*soc0, H:+els.Hvsg.value, R:(+els.Rvsg.value)/100,
+              socTarget:(+els.socTarget.value)/100, socBand:(+els.socBand.value)/100, P:0,
+              greenStore:0, E_greenOut:0 },
+      fuelL:0, E_load:0,
+      curtWh:0, n1_ok:true, thd_ok:true,
       freezeReduce:false, freezeTimer:0
     };
 
-    // initialize diesel units according to inputs (priority: 3.3MW then 1.25MW)
-    st.dg.units = [];
-    const n33 = +els.dg33n.value;
-    const n12 = +els.dg12n.value;
-    for(let i=0;i<n33;i++) st.dg.units.push(newDG(3.3,"DG3.3"));
-    for(let i=0;i<n12;i++) st.dg.units.push(newDG(1.25,"DG1.25"));
-    // always ensure at least 1 online if allowOff=false
+    // initialize diesel units online with ~70% load
+    const n33 = +els.dg33n.value, n12=+els.dg12n.value;
+    for(let i=0;i<n33;i++) st.dg.units.push(newDG(3.3,"DG3.3",true));
+    for(let i=0;i<n12;i++) st.dg.units.push(newDG(1.25,"DG1.25",true));
     if(!st.dg.allowOff && st.dg.units.length===0){
-      st.dg.units.push(newDG(3.3,"DG3.3"));
+      st.dg.units.push(newDG(3.3,"DG3.3",true));
     }
     series=[]; t=0;
   }
 
-  function newDG(cap,type){
-    return {cap, type, online:true, P:cap*0.7, timer:0, starting:false, stopping:false};
+  function newDG(cap,type,online){
+    return {cap, type, online, P: online?cap*0.7:0, timer:0, starting:false, stopping:false};
   }
 
-  // PV profile: day shape * clouds * soiling
   function pvPower(time, T){
     const Pmax = st.pv.Pmax * st.pv.soil;
-    const shape = st.pv.shape;
-    const cloud = st.pv.cloud;
-    // day shape over [0..T], use sin(pi*t/T)^shape
+    const shape = st.pv.shape, cloud = st.pv.cloud;
     const x = Math.sin(Math.PI * (time/T));
     const day = Math.max(0,x)**shape;
-    // clouds: smooth pseudo-noise
-    const c = 0.5 + 0.5*Math.sin(0.03*time) * 0.6 + 0.4*Math.sin(0.011*time+1.7);
+    const c = 0.5 + 0.5*Math.sin(0.03*time)*0.6 + 0.4*Math.sin(0.011*time+1.7);
     const factor = clamp((1 - cloud) + cloud*c, 0, 1);
     return Pmax * day * factor;
   }
-
-  // Load profile: base + small sinus
   function loadPower(time){
-    const base = st.load.base;
-    const v = st.load.var;
-    return base + v*Math.sin(2*Math.PI*time/900); // 15分钟波动周期
+    return st.load.base + st.load.var*Math.sin(2*Math.PI*time/900);
   }
 
-  // Diesel dispatch logic (integer units, min load, delays, N-1 check)
   function dieselDispatch(dt, freqPU, residual){
-    // residual ≈ Load - PV (不含BESS快环)，用于确定需要的柴油合计出力
-    // Target: keep units in 0.6~0.85 per-unit if possible
-    const units = st.dg.units;
-    const sumCap = units.reduce((a,u)=>a+(u.online?u.cap:0),0);
-    const largest = Math.max(0, ...units.filter(u=>u.online).map(u=>u.cap));
-    const need = Math.max(0, residual); // MW
-
-    // N-1 check: if (sumCap - largest) < need (with small margin), start a unit
+    const u = st.dg.units;
+    let sumCap = u.reduce((a,x)=>a+(x.online?x.cap:0),0);
+    const largest = Math.max(0, ...u.filter(x=>x.online).map(x=>x.cap));
+    const need = Math.max(0, residual);
+    // N-1 check
     st.n1_ok = ((sumCap - largest) >= need*0.95);
     if(!st.n1_ok){
-      // try start a new unit if available off
-      // For simplicity: add a new unit of 3.3 or 1.25 if not exceeding max fleet
-      // (本仿真允许动态添加/移除在线台数作为调度效果演示，不限制总台数)
-      // 如果已有在线机组，但容量不足，尝试再“并入”一台3.3MW
-      units.push({cap:3.3, type:"DG3.3", online:false, P:0, timer:st.dg.delay, starting:true, stopping:false});
+      // 如果容量不足且允许并机，添加一台3.3MW待启
+      u.push({cap:3.3, type:"DG3.3", online:false, P:0, timer:st.dg.delay, starting:true, stopping:false});
+      sumCap += 3.3;
     }
-
-    // Ensure at least one online if not allowed to go diesel-off
-    if(!st.dg.allowOff && units.filter(u=>u.online||u.starting).length===0){
-      units.push({cap:3.3, type:"DG3.3", online:false, P:0, timer:st.dg.delay, starting:true, stopping:false});
+    // 至少1台
+    if(!st.dg.allowOff && u.filter(x=>x.online||x.starting).length===0){
+      u.push({cap:3.3, type:"DG3.3", online:false, P:0, timer:st.dg.delay, starting:true, stopping:false});
     }
-
-    // Decide desired online capacity ~ need / 0.75 (keep each ~75%)
-    const desiredCap = (need>0)? need/0.75 : 0;
-    // Online capacity counting those starting soon
-    let onlineCap = units.reduce((a,u)=>a+(u.online?u.cap:0),0);
-
-    // If onlineCap < desiredCap - 0.5MW => start new unit
+    // 期望在线容量（保持单机~75%）
+    const desiredCap = (need>0)? need/0.75 : (st.dg.allowOff?0:3.3);
+    let onlineCap = u.reduce((a,x)=>a+(x.online?x.cap:0),0);
     if(onlineCap < desiredCap - 0.5){
-      // prefer adding 1.25MW if shortage small, else 3.3MW
       const addCap = (desiredCap - onlineCap < 2.0)? 1.25 : 3.3;
-      units.push({cap:addCap, type:(addCap>2?"DG3.3":"DG1.25"), online:false, P:0, timer:st.dg.delay, starting:true, stopping:false});
-      onlineCap += addCap; // optimistic
+      u.push({cap:addCap, type:(addCap>2?"DG3.3":"DG1.25"), online:false, P:0, timer:st.dg.delay, starting:true, stopping:false});
+      onlineCap += addCap;
     }
-
-    // If onlineCap >> desiredCap and conditions ok => plan to stop a unit (respect delays and protections)
-    const canReduce = (!st.freezeReduce && st.bess.E/st.bess.Emax > 0.3); // 简化互锁：SOC太低不减机
+    const canReduce = (!st.freezeReduce && st.bess.E/st.bess.Emax > 0.3);
     if(canReduce && onlineCap - desiredCap > 2.0){
-      // pick smallest unit to stop
-      const cand = units.find(u=>u.online && !u.stopping && !u.starting && u.P < u.cap*0.6);
-      if(cand){
-        cand.stopping = true; cand.timer = st.dg.delay;
-      }
+      const cand = u.find(x=>x.online && !x.stopping && !x.starting && x.P < x.cap*0.6);
+      if(cand){ cand.stopping=true; cand.timer=st.dg.delay; }
     }
-
-    // Handle starting/stopping timers
-    for(const u of units){
-      if(u.starting){
-        u.timer -= dt;
-        if(u.timer<=0){ u.starting=false; u.online=true; u.P = u.cap*0.6; }
-      }
-      if(u.stopping){
-        // ramp down
-        u.P = Math.max(0, u.P - st.dg.ramp*dt*2);
-        u.timer -= dt;
-        if(u.timer<=0){ u.stopping=false; u.online=false; u.P=0; }
-      }
+    // timers
+    for(const x of u){
+      if(x.starting){ x.timer -= dt; if(x.timer<=0){ x.starting=false; x.online=true; x.P=x.cap*0.65; } }
+      if(x.stopping){ x.P = Math.max(0, x.P - st.dg.ramp*dt*2); x.timer -= dt; if(x.timer<=0){ x.stopping=false; x.online=false; x.P=0; } }
     }
-
-    // Now compute power sharing with droop & min load
-    const onlineUnits = units.filter(u=>u.online);
-    const PdgMax = onlineUnits.reduce((a,u)=>a+u.cap,0);
-    // droop effect: freqPU<0 => increase total diesel ref
+    // droop & min load
+    const online = u.filter(x=>x.online);
+    const PdgMax = online.reduce((a,x)=>a+x.cap,0);
     const droopAdj = - freqPU / Math.max(0.001, st.dg.Rdg) * PdgMax;
     let Pd_ref = clamp(need + droopAdj, 0, PdgMax);
-
-    // distribute Pd_ref among units keeping 0.6~0.85 and minPu
-    let remaining = Pd_ref;
-    for(const u of onlineUnits){
-      const minP = u.cap * st.dg.minPu;
-      const target = clamp(remaining/onlineUnits.length, minP, u.cap); // naive split then corrected by ramp
-      // ramp limit
-      const dP = clamp(target - u.P, -st.dg.ramp*dt, st.dg.ramp*dt);
-      u.P = clamp(u.P + dP, 0, u.cap);
+    // compute sum of mins
+    const sumMin = online.reduce((a,x)=>a + x.cap*st.dg.minPu, 0);
+    if(Pd_ref < sumMin) Pd_ref = sumMin; // 保证不低于单机最小负载之和
+    // distribute
+    for(const x of online){
+      const minP = x.cap*st.dg.minPu;
+      const target = clamp(Pd_ref/online.length, minP, x.cap);
+      const dP = clamp(target - x.P, -st.dg.ramp*dt, st.dg.ramp*dt);
+      x.P = clamp(x.P + dP, 0, x.cap);
     }
-
-    // total diesel power
-    const Pdg = onlineUnits.reduce((a,u)=>a+u.P,0);
-    return Pdg;
+    return online.reduce((a,x)=>a+x.P,0);
   }
 
-  // Fuel consumption estimate (L/h) using simple SFC curve by load ratio
   function fuelLH(units){
-    // SFC (g/kWh) approx vs per-unit load (pu): 0.25->300, 0.5->230, 0.75->205, 1.0->200
-    function sfc(pu){ // piecewise linear
+    function sfc(pu){
       if(pu<=0) return 0;
-      if(pu<=0.25) return 350*pu/0.25; // rising line from 0 to 350 at 0.25 to penalize idling
-      if(pu<=0.5) return 300 - (300-230)*( (pu-0.25)/0.25 );
-      if(pu<=0.75) return 230 - (230-205)*( (pu-0.5)/0.25 );
+      if(pu<=0.25) return 350*pu/0.25;
+      if(pu<=0.5) return 300 - (300-230)*((pu-0.25)/0.25);
+      if(pu<=0.75) return 230 - (230-205)*((pu-0.5)/0.25);
       return 205 - (205-200)*((pu-0.75)/0.25);
     }
-    const rho = 0.84; // kg/L
-    let Lh = 0;
-    for(const u of units){
-      if(!u.online || u.P<=0) continue;
-      const pu = clamp(u.P/u.cap, 0, 1);
-      const s = sfc(pu); // g/kWh
-      const kW = u.P*1000;
-      const kgph = s/1000 * kW; // kg per hour
-      const Lph = kgph / rho;   // L/h
-      Lh += Lph;
+    const rho=0.84;
+    let Lh=0;
+    for(const x of units){
+      if(!x.online||x.P<=0) continue;
+      const pu = clamp(x.P/x.cap,0,1);
+      const kW = x.P*1000;
+      const kgph = (sfc(pu)/1000) * kW;
+      Lh += kgph/rho;
     }
     return Lh;
   }
 
-  // BESS VSG fast loop + energy loop to drive SOC to target window
   function bessControl(dt, freqPU, Pinj_est){
     const Pmax = st.bess.Pmax;
-    // droop response
     const P_droop = clamp( - freqPU / Math.max(0.001, st.bess.R) * Pmax, -Pmax, Pmax);
-    // correct imbalance (prefer balance) — with weight
-    const P_corr = clamp( -Pinj_est, -Pmax, Pmax);
-    // energy loop (SOC->target)
+    const P_corr  = clamp( -Pinj_est, -Pmax, Pmax);
     const soc = st.bess.E/st.bess.Emax;
-    const err = (st.bess.socTarget - soc); // positive => need charge (negative power)
+    const err = (st.bess.socTarget - soc);
     const P_energy = clamp( err * st.bess.Pmax*0.3, -Pmax*0.6, Pmax*0.6 );
-    // combine
     let Pcmd = 0.55*P_corr + 0.35*P_droop + 0.10*P_energy;
-
-    // SOC soft limits
-    const soft = 0.1;
-    if(soc < soft) Pcmd = Math.min(Pcmd, 0);
-    if(soc > 1-soft) Pcmd = Math.max(Pcmd, 0);
-
-    // clamp
-    st.bess.P = clamp(Pcmd, -Pmax, Pmax);
+    const soft=0.1;
+    if(soc<soft) Pcmd=Math.min(Pcmd,0);
+    if(soc>1-soft) Pcmd=Math.max(Pcmd,0);
+    st.bess.P = clamp(Pcmd,-Pmax,Pmax);
   }
 
   function step(){
-    const dt = +els.dt.value;
-    const Tsim = +els.simMins.value * 60;
-    // signals
-    const Ppv = pvPower(t, Tsim);
+    const dt = +els.dt.value, Tsim = +els.simMins.value*60;
+    const Ppv_raw = pvPower(t,Tsim);
+    const Ppv = Ppv_raw;
     const Pload = loadPower(t);
 
-    // preliminary residual for diesel dispatch (let BESS handle fast dynamics)
+    // diesel dispatch uses residual before BESS
     const residual = Math.max(0, Pload - Ppv);
-
-    // frequency per-unit
     const fpu = (st.f - st.f0)/st.f0;
-
-    // Diesel integer dispatch
     const Pdg = dieselDispatch(dt, fpu, residual);
 
-    // Fast estimate of imbalance before BESS
+    // BESS control
     const Pinj_est = (Pdg + Ppv) - Pload;
-
-    // BESS VSG control
     bessControl(dt, fpu, Pinj_est);
 
-    // Frequency dynamics
-    // Total H = VSG.H + diesel inertia (approx prop to online MW)
-    const onlineMW = st.dg.units.reduce((a,u)=>a+(u.online?u.cap:0),0);
-    const Htot = st.bess.H + onlineMW * st.dg.HperMW;
-    const Pinj = (Pdg + Ppv + st.bess.P) - Pload;
-    const dfdt = (Pinj) / (2 * Math.max(0.2,Htot) * st.Sbase) * st.f0;
+    // Frequency dynamics (correct scaling, pu first)
+    const onlineMW = st.dg.units.reduce((a,x)=>a+(x.online?x.cap:0),0);
+    const Htot = st.bess.H + onlineMW*st.dg.HperMW;
+    const Pinj = (Pdg + Ppv + st.bess.P) - Pload; // MW
+    const dpu = Pinj / st.Sbase;
+    const dfdt = (dpu / (2*Math.max(0.2,Htot))) * st.f0;
     st.f += dfdt * dt;
 
-    // BESS energy update (MWh), track green energy store
+    // ---- Energy accounting ----
+    // PV to load first
+    const P_pv_to_load = Math.min(Ppv, Pload);
+    // PV surplus after direct-to-load
+    const P_pv_surplus = Math.max(0, Ppv - P_pv_to_load);
+    // BESS power sign: discharge>0 (to load), charge<0 (from bus)
     const P_bess = st.bess.P;
-    st.bess.E = clamp( st.bess.E - P_bess * dt/3600, 0, st.bess.Emax );
-    // Track "green store": when charging and PV surplus exists -> add; when discharging -> consume
-    const pvSurplus = Math.max(0, Ppv - Pload - Math.max(0, -P_bess)); // surplus beyond load+charging
-    if(P_bess<0){ // charging
-      const charge = -P_bess*dt/3600; // MWh
-      const greenIn = Math.min(charge, Math.max(0, (Ppv - (Pload>0?Math.min(Ppv,Pload):0))*dt/3600 ));
-      st.bess.greenStore = clamp(st.bess.greenStore + greenIn, 0, st.bess.Emax);
-    } else if(P_bess>0){ // discharging
-      const discharge = P_bess*dt/3600;
-      const greenOut = Math.min(discharge, st.bess.greenStore);
-      st.bess.greenStore = clamp(st.bess.greenStore - greenOut, 0, st.bess.Emax);
-      st.E_greenOut += greenOut;
+
+    // PV -> BESS charge portion (counted as green store), limited by charge power
+    const P_pv_to_bess = Math.min(-Math.min(0,P_bess), P_pv_surplus);
+    // curtailment = PV - (to load + to bess)
+    const P_pv_curt = Math.max(0, Ppv - P_pv_to_load - P_pv_to_bess);
+
+    // Update BESS energy
+    st.bess.E = clamp(st.bess.E - P_bess * dt/3600, 0, st.bess.Emax);
+
+    // Green store update
+    st.bess.greenStore = clamp(st.bess.greenStore + P_pv_to_bess*dt/3600, 0, st.bess.Emax);
+    if(P_bess>0){
+      const e_dis = P_bess*dt/3600;
+      const greenOut = Math.min(e_dis, st.bess.greenStore);
+      st.bess.greenStore -= greenOut;
+      st.bess.E_greenOut += greenOut;
     }
 
-    // curtailment if PV > load + charging capability
-    const chargeCap = Math.max(0, -Math.min(0, st.bess.P)); // positive when charging
-    const curt = Math.max(0, Ppv - Pload - chargeCap);
-    st.pv.curtWh += curt * dt/3600;
-    st.curtWh = st.pv.curtWh;
-
-    // KPIs energy accumulation
-    st.E_pv += Ppv * dt/3600;
-    st.E_load += Pload * dt/3600;
+    // KPIs energy
+    st.pv.E_direct += P_pv_to_load*dt/3600;
+    st.curtWh += P_pv_curt*dt/3600;
+    st.E_load += Pload*dt/3600;
 
     // Fuel
     const Lh = fuelLH(st.dg.units);
-    st.fuelL += Lh * dt/3600;
+    st.fuelL += Lh*dt/3600;
 
-    // Protections (simplified): if |f-f0|>0.5Hz freeze reductions for 5 min
-    if(Math.abs(st.f - st.f0) > 0.5){
-      st.freezeReduce = true;
-      st.freezeTimer = 300;
-    }
-    if(st.freezeTimer>0){
-      st.freezeTimer -= dt;
-      if(st.freezeTimer<=0) st.freezeReduce=false;
-    }
+    // Protections
+    if(Math.abs(st.f - st.f0) > 0.5){ st.freezeReduce=true; st.freezeTimer=300; }
+    if(st.freezeTimer>0){ st.freezeTimer -= dt; if(st.freezeTimer<=0) st.freezeReduce=false; }
 
-    // THD placeholder: if many VFD-like load (sim via var amplitude), set warn
-    st.thd_ok = (els.loadVar.value <= 1.2);
+    // THD placeholder
+    st.thd_ok = (+els.loadVar.value <= 1.2);
 
-    // record
     series.push({t, Ppv, Pload, Pdg, Pb:P_bess, f:st.f, soc:100*st.bess.E/st.bess.Emax});
-
     t += dt;
   }
 
-  // ---------- Plotting ----------
-  function drawSeries(ctx, w, h, xs, ys, color){
+  // Plotting
+  function drawSeries(ctx,w,h,xs,ys,color){
     ctx.beginPath();
-    for(let i=0;i<xs.length;i++){
-      if(i===0) ctx.moveTo(xs[i], ys[i]); else ctx.lineTo(xs[i], ys[i]);
-    }
-    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+    for(let i=0;i<xs.length;i++){ if(i===0) ctx.moveTo(xs[i],ys[i]); else ctx.lineTo(xs[i],ys[i]); }
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
   }
-
   function plotPower(){
     const w = els.pPlot.width = Math.floor(els.pPlot.clientWidth * devicePixelRatio);
     const h = els.pPlot.height = Math.floor(els.pPlot.clientHeight * devicePixelRatio);
     pctx.clearRect(0,0,w,h);
-    const N = series.length; if(N<2) return;
-    const xmin = series[0].t, xmax = series[N-1].t;
-    const xs = series.map(d => (d.t - xmin)/(xmax-xmin || 1) * (w-50) + 35);
-    const allP = series.flatMap(d=>[d.Ppv, d.Pload, d.Pdg, d.Pb]);
-    const pmin = Math.min(0, ...allP), pmax = Math.max(...allP, 1);
-    const ymap = v => (1 - (v - pmin)/(pmax - pmin || 1))*(h-30) + 15;
+    const N=series.length; if(N<2) return;
+    const xmin=series[0].t, xmax=series[N-1].t;
+    const xs = series.map(d => (d.t-xmin)/(xmax-xmin||1)*(w-50)+35);
+    const allP = series.flatMap(d=>[d.Ppv,d.Pload,d.Pdg,d.Pb]);
+    const pmin = Math.min(0,...allP), pmax = Math.max(...allP,1);
+    const ymap = v => (1-(v-pmin)/(pmax-pmin||1))*(h-30)+15;
     // grid
-    pctx.strokeStyle = '#f3f4f6'; pctx.lineWidth=1;
-    for(let i=0;i<5;i++){ const y = lerp(15,h-15,i/4); pctx.beginPath(); pctx.moveTo(35,y); pctx.lineTo(w-12,y); pctx.stroke(); }
+    pctx.strokeStyle='#f3f4f6'; pctx.lineWidth=1;
+    for(let i=0;i<5;i++){ const y=(i/4)*(h-30)+15; pctx.beginPath(); pctx.moveTo(35,y); pctx.lineTo(w-12,y); pctx.stroke(); }
     // series
-    drawSeries(pctx,w,h,xs,series.map(d=>ymap(d.Ppv)),'#d4a106'); // PV
-    drawSeries(pctx,w,h,xs,series.map(d=>ymap(d.Pload)),'#111111'); // Load
-    drawSeries(pctx,w,h,xs,series.map(d=>ymap(d.Pdg)),'#1f6feb'); // Diesel
-    drawSeries(pctx,w,h,xs,series.map(d=>ymap(d.Pb)),'#0f766e'); // BESS
-    // legend
-    pctx.fillStyle='#111'; pctx.font = `${12*devicePixelRatio}px sans-serif`;
-    const leg = [['PV','#d4a106'],['Load','#111'],['Diesel','#1f6feb'],['BESS','#0f766e']];
-    leg.forEach((L,i)=>{ pctx.fillStyle=L[1]; pctx.fillRect(40+i*90, 10, 18, 6); pctx.fillStyle='#374151'; pctx.fillText(L[0], 64+i*90, 16); });
+    drawSeries(pctx,w,h,xs,series.map(d=>ymap(d.Ppv)),'#d4a106');
+    drawSeries(pctx,w,h,xs,series.map(d=>ymap(d.Pload)),'#111111');
+    drawSeries(pctx,w,h,xs,series.map(d=>ymap(d.Pdg)),'#1f6feb');
+    drawSeries(pctx,w,h,xs,series.map(d=>ymap(d.Pb)),'#0f766e');
+    pctx.fillStyle='#374151'; pctx.font=`${12*devicePixelRatio}px sans-serif`;
+    [['PV','#d4a106'],['Load','#111'],['Diesel','#1f6feb'],['BESS','#0f766e']].forEach((L,i)=>{
+      pctx.fillStyle=L[1]; pctx.fillRect(40+i*90,10,18,6); pctx.fillStyle='#374151'; pctx.fillText(L[0],64+i*90,16);
+    });
   }
-
   function plotFreq(){
     const w = els.fPlot.width = Math.floor(els.fPlot.clientWidth * devicePixelRatio);
     const h = els.fPlot.height = Math.floor(els.fPlot.clientHeight * devicePixelRatio);
     fctx.clearRect(0,0,w,h);
-    const N = series.length; if(N<2) return;
-    const xmin = series[0].t, xmax = series[N-1].t;
-    const xs = series.map(d => (d.t - xmin)/(xmax-xmin || 1) * (w-50) + 35);
-
-    const fVals = series.map(d=>d.f);
-    const socVals = series.map(d=>d.soc);
-    const f0 = st.f0;
-    const fmin = Math.min(...fVals, f0-1), fmax = Math.max(...fVals, f0+1);
-    const ymapF = v => (1 - (v - fmin)/(fmax - fmin || 1))*(h-30) + 15;
-    const ymapS = v => (1 - (v - 0)/(100 - 0 || 1))*(h-30) + 15;
-
-    // grid
-    fctx.strokeStyle = '#f3f4f6'; fctx.lineWidth=1;
-    for(let i=0;i<5;i++){ const y = lerp(15,h-15,i/4); fctx.beginPath(); fctx.moveTo(35,y); fctx.lineTo(w-12,y); fctx.stroke(); }
-    // series
-    drawSeries(fctx,w,h,xs,fVals.map(ymapF),'#e11d48'); // freq
-    drawSeries(fctx,w,h,xs,socVals.map(ymapS),'#0f766e'); // SOC
-
-    // legend
-    fctx.fillStyle='#374151'; fctx.font = `${12*devicePixelRatio}px sans-serif`;
-    fctx.fillText('f (Hz) & SOC (%)', 8, 16*devicePixelRatio);
-    fctx.fillStyle='#e11d48'; fctx.fillRect(40, 10, 18, 6); fctx.fillStyle='#374151'; fctx.fillText('f', 64, 16);
-    fctx.fillStyle='#0f766e'; fctx.fillRect(90, 10, 18, 6); fctx.fillStyle='#374151'; fctx.fillText('SOC', 114, 16);
-
-    // live readout
-    const last = series[N-1];
-    els.live.textContent =
-      `t=${last.t.toFixed(1)}s  |  f=${last.f.toFixed(3)} Hz  |  PV=${last.Ppv.toFixed(2)} MW  |  Diesel=${last.Pdg.toFixed(2)} MW  |  BESS=${last.Pb.toFixed(2)} MW  |  SOC=${last.soc.toFixed(1)}%  |  Load=${last.Pload.toFixed(2)} MW`;
+    const N=series.length; if(N<2) return;
+    const xmin=series[0].t, xmax=series[N-1].t;
+    const xs = series.map(d => (d.t-xmin)/(xmax-xmin||1)*(w-50)+35);
+    const fVals=series.map(d=>d.f), socVals=series.map(d=>d.soc);
+    const f0=st.f0; const fmin=Math.min(...fVals,f0-1), fmax=Math.max(...fVals,f0+1);
+    const ymapF=v=>(1-(v-fmin)/(fmax-fmin||1))*(h-30)+15;
+    const ymapS=v=>(1-(v-0)/(100-0||1))*(h-30)+15;
+    fctx.strokeStyle='#f3f4f6'; fctx.lineWidth=1;
+    for(let i=0;i<5;i++){ const y=(i/4)*(h-30)+15; fctx.beginPath(); fctx.moveTo(35,y); fctx.lineTo(w-12,y); fctx.stroke(); }
+    drawSeries(fctx,w,h,xs,fVals.map(ymapF),'#e11d48');
+    drawSeries(fctx,w,h,xs,socVals.map(ymapS),'#0f766e');
+    fctx.fillStyle='#374151'; fctx.font=`${12*devicePixelRatio}px sans-serif`;
+    fctx.fillText('f (Hz) & SOC (%)',8,16*devicePixelRatio);
+    const last=series[N-1];
+    els.live.textContent = `t=${last.t.toFixed(1)}s | f=${last.f.toFixed(3)} Hz | PV=${last.Ppv.toFixed(2)} MW | Diesel=${last.Pdg.toFixed(2)} MW | BESS=${last.Pb.toFixed(2)} MW | SOC=${last.soc.toFixed(1)}% | Load=${last.Pload.toFixed(2)} MW`;
   }
 
   function refreshKPI(){
     els.kpiFuel.textContent = fmt(st.fuelL, "L");
-    const green = st.E_pv + st.E_greenOut; // 粗略：直接PV + 经BESS放出的绿电
-    const re = (st.E_load>0)? 100*green/st.E_load : 0;
-    els.kpiRE.textContent = fmt(re, "%");
+    // Renewable share = PV->Load + (BESS discharged energy sourced from PV)  over total load
+    const E_RE = st.pv.E_direct + st.bess.E_greenOut;
+    const re = (st.E_load>0)? 100*E_RE/st.E_load : 0;
+    els.kpiRE.textContent = fmt(Math.min(re,100), "%");
     els.kpiCurt.textContent = fmt(st.curtWh, "MWh");
     els.kpiN1.innerHTML = st.n1_ok ? '<span class="flag ok">OK</span>' : '<span class="flag bad">Not Met</span>';
     els.kpiTHD.innerHTML = st.thd_ok ? '<span class="flag ok">OK</span>' : '<span class="flag warn">High</span>';
   }
 
-  function loop(){
-    if(!running) return;
-    step();
-    plotPower(); plotFreq(); refreshKPI();
-    requestAnimationFrame(loop);
-  }
+  function loop(){ if(!running) return; step(); plotPower(); plotFreq(); refreshKPI(); requestAnimationFrame(loop); }
 
-  // ---------- Presets ----------
-  function applyPreset(name){
-    if(name==="Arctic"){
-      els.PpvMax.value = 12; // 冬季可用容量较小
-      els.PbMax.value = 6; els.EbMax.value = 15; els.socTarget.value=60; els.socBand.value=10;
-      els.dg33n.value = 3; els.dg12n.value = 0; els.dgMinPu.value = 0.4; els.allowDieselOff.value="false";
-      els.pvSoil.value=0.95; els.pvCloud.value=0.25; els.pvShape.value=1.2;
-    }else if(name==="Desert"){
-      els.PpvMax.value = 30; els.pvSoil.value=0.85; els.pvCloud.value=0.4; els.pvShape.value=1.6;
-      els.PbMax.value = 8; els.EbMax.value = 20; els.socTarget.value=55; els.socBand.value=10;
-      els.dg33n.value = 2; els.dg12n.value = 0; els.dgMinPu.value = 0.35; els.allowDieselOff.value="true";
-    }else if(name==="High"){
-      els.PpvMax.value = 24; els.pvSoil.value=0.9; els.pvCloud.value=0.35; els.pvShape.value=1.5;
-      els.PbMax.value = 8; els.EbMax.value = 20; els.socTarget.value=55; els.socBand.value=10;
-      els.dg33n.value = 3; els.dg12n.value = 1; els.dgMinPu.value = 0.35; els.allowDieselOff.value="false";
-    }else{
-      els.PpvMax.value = 30; els.PbMax.value = 8; els.EbMax.value = 20; els.socTarget.value=55; els.socBand.value=10;
-      els.dg33n.value = 3; els.dg12n.value = 0; els.dgMinPu.value = 0.35; els.allowDieselOff.value="false";
-      els.pvSoil.value=0.9; els.pvCloud.value=0.35; els.pvShape.value=1.5;
-    }
-  }
-
-  // ---------- Buttons ----------
+  // Buttons
   els.startBtn.onclick = ()=>{ if(!running){ if(series.length===0) initState(); running=true; requestAnimationFrame(loop);} };
   els.pauseBtn.onclick = ()=>{ running=false; };
   els.resetBtn.onclick = ()=>{ running=false; initState(); plotPower(); plotFreq(); refreshKPI(); };
-  els.presetArctic.onclick = ()=>{ applyPreset("Arctic"); };
-  els.presetDesert.onclick = ()=>{ applyPreset("Desert"); };
-  els.presetHigh.onclick = ()=>{ applyPreset("High"); };
-  els.presetDefault.onclick = ()=>{ applyPreset("Default"); };
 
-  // init first frame
+  // init
   initState(); plotPower(); plotFreq(); refreshKPI();
 })();
 </script>
 </body>
 </html>
 """
-
-# Save to a file
-file_path = "/mnt/data/mine_microgrid_sim_v2.html"
+# Save file
+file_path = "/mnt/data/mine_microgrid_sim_v2_1.html"
 with open(file_path, "w", encoding="utf-8") as f:
-    f.write(html_v2)
+    f.write(html_v21)
 
 file_path

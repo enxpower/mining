@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>离网矿区光风储柴仿真 · V2.4_geo · 动态节油对照</title>
+<title>Off-Grid Mining Microgrid · V2.4_geo · Fuel-Saving Baseline</title>
 <style>
   :root{--fg:#111;--muted:#666;--box:#d1d5db}
   *{box-sizing:border-box}
@@ -29,172 +29,232 @@
   .dash{background:linear-gradient(90deg,#000 0 40%,transparent 40% 60%,#000 60% 100%)}
   .dash2{background:linear-gradient(90deg,#000 0 30%,transparent 30% 55%,#000 55% 100%)}
   .stack{position:relative}
-  footer{margin-top:14px;padding-top:10px;border-top:1px dashed #e5e7eb;color:#6b7280;font-size:12px;display:flex;gap:14px;flex-wrap:wrap}
-  footer a{color:#2563eb;text-decoration:none}
-
+  footer{margin-top:14px;padding-top:10px;border-top:1px dashed #e5e7eb;color:#6b7280;font-size:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  footer a{color:#2563eb;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  .iconsvg{width:16px;height:16px;display:inline-block}
+  /* fixed top bar */
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .langbtn{font-size:12px;border:1px solid #ddd;border-radius:8px;padding:6px 10px;background:#fff;cursor:pointer}
   /* ✅ 防抖动：固定 live 行高 + 禁止换行 + 省略号 */
-  #live{
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    min-height:1.5em;
-  }
+  #live{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:1.5em}
 </style>
 </head>
 <body>
-<h1>Off-Grid Mining Microgrid — 35 kV · <span class="kv">V2.4_geo</span></h1>
+<div class="topbar">
+  <h1><span data-i18n="title">Off-Grid Mining Microgrid — 35 kV</span> · <span class="kv">V2.4_geo</span></h1>
+  <button id="langBtn" class="langbtn">EN | 中文</button>
+</div>
 
-<!-- 全局 & 地理 -->
+<!-- Global & Geo -->
 <div class="row">
   <div class="card">
-    <b>全局</b>
-    <label>仿真时长（小时）</label><input id="simHours" type="number" value="24" step="1" min="1">
-    <label>步长 dt（秒）</label><input id="dt" type="number" value="0.5" step="0.1" min="0.05">
-    <label>名义频率 f0（Hz）</label><input id="f0" type="number" value="60" step="1" min="40" max="65">
-    <label>系统阻尼 D（pu）</label><input id="Dsys" type="number" value="2.2" step="0.1">
-    <label>负荷随频 α（%/Hz）</label><input id="alphaLoad" type="number" value="2.0" step="0.1">
+    <b data-i18n="global">Global</b>
+    <label><span data-i18n="simHours">Simulation length (hours)</span></label><input id="simHours" type="number" value="24" step="1" min="1">
+    <label><span data-i18n="dt">Time step dt (s)</span></label><input id="dt" type="number" value="0.5" step="0.1" min="0.05">
+    <label><span data-i18n="f0">Nominal frequency f0 (Hz)</span></label><input id="f0" type="number" value="60" step="1" min="40" max="65">
+    <label><span data-i18n="Dsys">System damping D (pu)</span></label><input id="Dsys" type="number" value="2.2" step="0.1">
+    <label><span data-i18n="alphaLoad">Load freq-sensitivity α (%/Hz)</span></label><input id="alphaLoad" type="number" value="2.0" step="0.1">
     <div style="margin-top:8px">
-      <button class="btn" id="startBtn">▶ 开始</button>
-      <button class="btn secondary" id="pauseBtn">⏸ 暂停</button>
-      <button class="btn secondary" id="resetBtn">↺ 重置</button>
+      <button class="btn" id="startBtn" data-i18n="start">▶ Start</button>
+      <button class="btn secondary" id="pauseBtn" data-i18n="pause">⏸ Pause</button>
+      <button class="btn secondary" id="resetBtn" data-i18n="reset">↺ Reset</button>
     </div>
   </div>
 
   <div class="card">
-    <b>地理/日照（影响 PV & 日出/日落标记）</b>
-    <label>预设</label>
+    <b data-i18n="geo">Geography / Insolation</b>
+    <label><span data-i18n="preset">Preset</span></label>
     <select id="geoPreset">
-      <option value="custom" selected>自定义</option>
-      <option value="arctic">极寒（北极圈，φ≈70°N）</option>
-      <option value="desert">沙漠（φ≈25°N）</option>
-      <option value="africa">非洲热带（φ≈10°N）</option>
-      <option value="andes">南美安第斯（φ≈20°S）</option>
+      <option value="custom" selected data-i18n="custom">Custom</option>
+      <option value="arctic" data-i18n="arctic">Arctic (φ≈70°N)</option>
+      <option value="desert" data-i18n="desert">Desert (φ≈25°N)</option>
+      <option value="africa" data-i18n="africa">Tropical Africa (φ≈10°N)</option>
+      <option value="andes" data-i18n="andes">Andes (φ≈20°S)</option>
     </select>
-    <label>纬度 φ（°，北正南负）</label><input id="latDeg" type="number" value="25" step="0.5" min="-75" max="75">
-    <label>年内日序（1–365）</label><input id="doy" type="number" value="172" step="1" min="1" max="365">
-    <label>PV 污染/积尘（0.7–1）</label><input id="pvSoil" type="number" value="0.9" step="0.01" min="0.7" max="1">
+    <label><span data-i18n="lat">Latitude φ (°)</span></label><input id="latDeg" type="number" value="25" step="0.5" min="-75" max="75">
+    <label><span data-i18n="doy">Day-of-year (1–365)</span></label><input id="doy" type="number" value="172" step="1" min="1" max="365">
+    <label><span data-i18n="pvSoil">PV soiling (0.7–1)</span></label><input id="pvSoil" type="number" value="0.9" step="0.01" min="0.7" max="1">
   </div>
 
   <div class="card">
-    <b>负载 / 可再生（设 0 即无此项）</b>
-    <label>负载基线（MW）</label><input id="Pload" type="number" value="12" step="0.5" min="0">
-    <label>负载波动幅度（MW）</label><input id="loadVar" type="number" value="1.2" step="0.2" min="0">
+    <b data-i18n="load_ren">Load / Renewables (0 to disable)</b>
+    <label><span data-i18n="Pload">Load baseline (MW)</span></label><input id="Pload" type="number" value="12" step="0.5" min="0">
+    <label><span data-i18n="loadVar">Load variation (MW)</span></label><input id="loadVar" type="number" value="1.2" step="0.2" min="0">
     <hr>
-    <label>PV 上限（MW）</label><input id="PpvMax" type="number" value="30" step="1" min="0">
-    <label>PV 日形（1–3）</label><input id="pvShape" type="number" value="1.5" step="0.1" min="1" max="3">
-    <label>云影强度（0–1）</label><input id="pvCloud" type="number" value="0.35" step="0.05" min="0" max="1">
+    <label><span data-i18n="PpvMax">PV max (MW)</span></label><input id="PpvMax" type="number" value="30" step="1" min="0">
+    <label><span data-i18n="pvShape">PV day-shape (1–3)</span></label><input id="pvShape" type="number" value="1.5" step="0.1" min="1" max="3">
+    <label><span data-i18n="pvCloud">Cloudiness (0–1)</span></label><input id="pvCloud" type="number" value="0.35" step="0.05" min="0" max="1">
     <hr>
-    <label>风电上限（MW）</label><input id="PwindMax" type="number" value="6" step="1" min="0">
-    <label>平均风速（m/s）</label><input id="windMean" type="number" value="8" step="0.5" min="0">
-    <label>风速波动（0–1）</label><input id="windVar" type="number" value="0.4" step="0.05" min="0" max="1">
+    <label><span data-i18n="PwindMax">Wind max (MW)</span></label><input id="PwindMax" type="number" value="6" step="1" min="0">
+    <label><span data-i18n="windMean">Mean wind speed (m/s)</span></label><input id="windMean" type="number" value="8" step="0.5" min="0">
+    <label><span data-i18n="windVar">Wind variability (0–1)</span></label><input id="windVar" type="number" value="0.4" step="0.05" min="0" max="1">
   </div>
 
   <div class="card">
-    <b>柴油（VF）</b>
-    <label>3.3MW 初始在网台数（0–6）</label><input id="dg33n" type="number" value="3" step="1" min="0" max="6">
-    <label>1.25MW 初始在网台数（0–2）</label><input id="dg12n" type="number" value="0" step="1" min="0" max="2">
-    <label>有功下垂 R<sub>P</sub>（%）</label><input id="Rdg" type="number" value="4" step="0.5">
-    <label>单台最低负载（pu）</label><input id="dgMinPu" type="number" value="0.35" step="0.05">
-    <label>上调爬坡（MW/s）</label><input id="rampUp" type="number" value="0.2" step="0.05">
-    <label>下调爬坡（MW/s）</label><input id="rampDn" type="number" value="1.0" step="0.1">
-    <label>启停延时（s）</label><input id="dgDelay" type="number" value="600" step="30">
-    <label>启停迟滞上/下（MW）</label><input id="dgHyst" type="number" value="1.5" step="0.1">
-    <label>允许全停</label>
-    <select id="allowDieselOff"><option value="false" selected>否（至少1台在线）</option><option value="true">是</option></select>
+    <b data-i18n="diesel">Diesel (VF)</b>
+    <label><span data-i18n="dg33n">3.3MW initial on-line (0–6)</span></label><input id="dg33n" type="number" value="3" step="1" min="0" max="6">
+    <label><span data-i18n="dg12n">1.25MW initial on-line (0–2)</span></label><input id="dg12n" type="number" value="0" step="1" min="0" max="2">
+    <label><span data-i18n="Rdg">Active power droop R<sub>P</sub> (%)</span></label><input id="Rdg" type="number" value="4" step="0.5">
+    <label><span data-i18n="dgMinPu">Per-unit min load</span></label><input id="dgMinPu" type="number" value="0.35" step="0.05">
+    <label><span data-i18n="rampUp">Ramp up (MW/s)</span></label><input id="rampUp" type="number" value="0.2" step="0.05">
+    <label><span data-i18n="rampDn">Ramp down (MW/s)</span></label><input id="rampDn" type="number" value="1.0" step="0.1">
+    <label><span data-i18n="dgDelay">Start/stop delay (s)</span></label><input id="dgDelay" type="number" value="600" step="30">
+    <label><span data-i18n="dgHyst">Start/stop hysteresis (MW)</span></label><input id="dgHyst" type="number" value="1.5" step="0.1">
+    <label><span data-i18n="allowOff">Allow all-off</span></label>
+    <select id="allowDieselOff"><option value="false" selected data-i18n="no">No (keep ≥1 online)</option><option value="true" data-i18n="yes">Yes</option></select>
   </div>
 
   <div class="card">
-    <b>BESS（VSG）</b>
-    <label>P<sub>max</sub>（MW）</label><input id="PbMax" type="number" value="8" step="0.5" min="0">
-    <label>E<sub>max</sub>（MWh）</label><input id="EbMax" type="number" value="20" step="1" min="0">
-    <label>初始 SOC（%）</label><input id="soc0" type="number" value="60" step="1" min="0" max="100">
-    <label>下垂 R<sub>P</sub>（%）</label><input id="Rvsg" type="number" value="3" step="0.5">
-    <label>虚拟惯量 H（s）</label><input id="Hvsg" type="number" value="6.0" step="0.1">
-    <label>SOC 目标 / 窗口（% / %）</label>
+    <b data-i18n="bess">BESS (VSG)</b>
+    <label><span>P<sub>max</sub> (MW)</span></label><input id="PbMax" type="number" value="8" step="0.5" min="0">
+    <label><span>E<sub>max</sub> (MWh)</span></label><input id="EbMax" type="number" value="20" step="1" min="0">
+    <label><span data-i18n="soc0">Initial SOC (%)</span></label><input id="soc0" type="number" value="60" step="1" min="0" max="100">
+    <label><span data-i18n="Rvsg">Droop R<sub>P</sub> (%)</span></label><input id="Rvsg" type="number" value="3" step="0.5">
+    <label><span data-i18n="Hvsg">Virtual inertia H (s)</span></label><input id="Hvsg" type="number" value="6.0" step="0.1">
+    <label><span data-i18n="socTarget">SOC target / band (% / %)</span></label>
     <div class="row" style="gap:8px"><input id="socTarget" type="number" value="55"><input id="socBand" type="number" value="10"></div>
-    <label>应急：|Δf| / 过载倍数 / 时间窗（Hz / × / s）</label>
+    <label><span data-i18n="emg">Emergency: |Δf| / overload× / window (Hz / × / s)</span></label>
     <div class="row" style="gap:8px"><input id="femg" type="number" value="0.2" step="0.05"><input id="overMul" type="number" value="1.4" step="0.1"><input id="overSec" type="number" value="8" step="1"></div>
   </div>
 
   <div class="card">
-    <b>保护/限功</b>
-    <label>RoCoF 限值（Hz/s）</label><input id="rocMax" type="number" value="0.9" step="0.1">
-    <label>Hz–W 限功：k1(60.2–60.5)/k2(&gt;60.5)</label>
+    <b data-i18n="prot">Protection / Limiting</b>
+    <label><span data-i18n="rocMax">RoCoF max (Hz/s)</span></label><input id="rocMax" type="number" value="0.9" step="0.1">
+    <label><span data-i18n="hzw">Hz–W limit: k1(60.2–60.5)/k2(&gt;60.5)</span></label>
     <div class="row" style="gap:8px"><input id="kof1" type="number" value="0.5" step="0.1"><input id="kof2" type="number" value="2.0" step="0.1"></div>
-    <label>OF1 阈值（Hz）/时限（s）</label>
+    <label><span>OF1 thresh (Hz)/time (s)</span></label>
     <div class="row" style="gap:8px"><input id="of1f" type="number" value="60.5" step="0.1"><input id="of1t" type="number" value="10" step="1"></div>
-    <label>OF2 阈值（Hz）/时限（s）</label>
+    <label><span>OF2 thresh (Hz)/time (s)</span></label>
     <div class="row" style="gap:8px"><input id="of2f" type="number" value="61.0" step="0.1"><input id="of2t" type="number" value="0.2" step="0.1"></div>
-    <label>跳闸后重合闸（s）</label><input id="reclose" type="number" value="30" step="1">
+    <label><span data-i18n="reclose">Reclose after trip (s)</span></label><input id="reclose" type="number" value="30" step="1">
   </div>
 </div>
 
-<!-- 视窗控制 -->
+<!-- Window control -->
 <div class="row">
   <div class="card" style="flex:1 1 420px">
-    <b>视窗控制（可滑动时间轴）</b>
-    <label>视窗长度（小时）</label><input id="viewHours" type="number" value="4" step="0.5" min="0.5">
-    <label>视窗起点（小时）</label><input id="viewStart" type="range" min="0" max="20" step="0.1" value="0">
+    <b data-i18n="view">Window control (draggable)</b>
+    <label><span data-i18n="viewHours">Window length (hours)</span></label><input id="viewHours" type="number" value="4" step="0.5" min="0.5">
+    <label><span data-i18n="viewStart">Window start (hours)</span></label><input id="viewStart" type="range" min="0" max="20" step="0.1" value="0">
     <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
-      <label style="display:flex;align-items:center;gap:6px"><input id="followLive" type="checkbox" checked> 跟随实时</label>
+      <label style="display:flex;align-items:center;gap:6px"><input id="followLive" type="checkbox" checked> <span data-i18n="followLive">Follow live</span></label>
       <span class="kv" id="viewLabel">[0.0, 4.0] h</span>
     </div>
   </div>
 </div>
 
-<!-- 图区 -->
+<!-- Plots -->
 <div class="row">
   <div class="card stack" style="flex:2 1 560px">
-    <b>功率（MW） · 视窗</b>
+    <b data-i18n="powerPlot">Power (MW) · Window</b>
     <div class="legend">
-      <div class="legend-row"><div class="swatch" style="background:#E69F00"></div><span>PV</span></div>
-      <div class="legend-row"><div class="swatch dash2" style="background-image:linear-gradient(90deg,#D55E00 0 30%,transparent 30% 55%,#D55E00 55% 100%)"></div><span>Wind</span></div>
-      <div class="legend-row"><div class="swatch" style="background:#374151"></div><span>Load</span></div>
-      <div class="legend-row"><div class="swatch" style="background:#0072B2"></div><span>Diesel</span></div>
-      <div class="legend-row"><div class="swatch dash" style="background-image:linear-gradient(90deg,#009E73 0 40%,transparent 40% 60%,#009E73 60% 100%)"></div><span>BESS（+放/−充）</span></div>
-      <div class="legend-row"><div class="swatch" style="background:#f59e0b;height:8px;width:8px;border-radius:50%"></div><span>日出/日落</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#E69F00"></div><span data-i18n="leg_pv">PV</span></div>
+      <div class="legend-row"><div class="swatch dash2" style="background-image:linear-gradient(90deg,#D55E00 0 30%,transparent 30% 55%,#D55E00 55% 100%)"></div><span data-i18n="leg_wind">Wind</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#374151"></div><span data-i18n="leg_load">Load</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#0072B2"></div><span data-i18n="leg_diesel">Diesel</span></div>
+      <div class="legend-row"><div class="swatch dash" style="background-image:linear-gradient(90deg,#009E73 0 40%,transparent 40% 60%,#009E73 60% 100%)"></div><span data-i18n="leg_bess">BESS (+dis/−ch)</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#f59e0b;height:8px;width:8px;border-radius:50%"></div><span data-i18n="leg_sun">Sunrise/Sunset</span></div>
     </div>
     <canvas id="pPlot"></canvas>
   </div>
   <div class="card stack" style="flex:1 1 340px">
-    <b>频率（Hz）/ SOC（%） · 视窗</b>
+    <b data-i18n="freqPlot">Frequency (Hz) / SOC (%) · Window</b>
     <div class="legend">
-      <div class="legend-row"><div class="swatch" style="background:#6A3D9A"></div><span>Freq</span></div>
-      <div class="legend-row"><div class="swatch dash" style="background-image:linear-gradient(90deg,#009E73 0 40%,transparent 40% 60%,#009E73 60% 100%)"></div><span>SOC</span></div>
-      <div class="legend-row"><div class="swatch" style="background:#9ca3af;height:2px;width:18px"></div><span>f₀=60 Hz 基线</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#6A3D9A"></div><span data-i18n="leg_freq">Freq</span></div>
+      <div class="legend-row"><div class="swatch dash" style="background-image:linear-gradient(90deg,#009E73 0 40%,transparent 40% 60%,#009E73 60% 100%)"></div><span data-i18n="leg_soc">SOC</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#9ca3af;height:2px;width:18px"></div><span data-i18n="leg_f0">f₀=60 Hz baseline</span></div>
     </div>
     <canvas id="fPlot"></canvas>
     <div id="live" class="kv" style="margin-top:6px"></div>
   </div>
 </div>
 
-<!-- 指标 & 日志 -->
+<!-- KPI & Log -->
 <div class="card">
-  <b>指标 & 日志</b>
+  <b data-i18n="metrics">Metrics & Log</b>
   <div class="kpi" id="kpiRow">
-    <div class="box"><b>燃油消耗</b><span id="kpiFuel">0 L</span></div>
-    <div class="box"><b>燃油对照</b><span id="kpiFuelBase">0 L</span></div>
-    <div class="box"><b>燃油节省</b><span id="kpiFuelSave">0 L</span></div>
-    <div class="box"><b>可再生占比</b><span id="kpiRE">0%</span></div>
-    <div class="box"><b>PV 发电量</b><span id="kpiPVgen">0 MWh</span></div>
-    <div class="box"><b>Wind 发电量</b><span id="kpiWDgen">0 MWh</span></div>
-    <div class="box"><b>弃电（PV+风）</b><span id="kpiCurt">0 MWh</span></div>
-    <div class="box"><b>N−1 校核</b><span id="kpiN1">OK</span></div>
-    <div class="box"><b>最近窗口</b><span id="kpiWin">—</span></div>
+    <div class="box"><b data-i18n="kpiFuel">Fuel use</b><span id="kpiFuel">0 L</span></div>
+    <div class="box"><b data-i18n="kpiFuelBase">Fuel (diesel baseline)</b><span id="kpiFuelBase">0 L</span></div>
+    <div class="box"><b data-i18n="kpiFuelSave">Fuel saved</b><span id="kpiFuelSave">0 L</span></div>
+    <div class="box"><b data-i18n="kpiRE">Renewables share</b><span id="kpiRE">0%</span></div>
+    <div class="box"><b data-i18n="kpiPVgen">PV energy</b><span id="kpiPVgen">0 MWh</span></div>
+    <div class="box"><b data-i18n="kpiWDgen">Wind energy</b><span id="kpiWDgen">0 MWh</span></div>
+    <div class="box"><b data-i18n="kpiCurt">Curtailment (PV+Wind)</b><span id="kpiCurt">0 MWh</span></div>
+    <div class="box"><b data-i18n="kpiN1">N−1 check</b><span id="kpiN1">OK</span></div>
+    <div class="box"><b data-i18n="kpiWin">Recent window</b><span id="kpiWin">—</span></div>
   </div>
   <div id="log"></div>
 </div>
 
 <footer>
-  <div>© Microgrid EMS Sim · V2.4_geo</div>
+  <div>© <span data-i18n="foot">Microgrid EMS Sim · V2.4_geo</span></div>
   <div>|</div>
-  <div>LinkedIn：<a href="https://www.linkedin.com/in/gongtiejing" target="_blank" rel="noopener">https://www.linkedin.com/in/gongtiejing</a></div>
+  <a href="https://www.linkedin.com/in/gongtiejing" target="_blank" rel="noopener" title="LinkedIn">
+    <svg class="iconsvg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0A66C2" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.95v5.66H9.36V9h3.41v1.56h.05c.47-.9 1.62-1.85 3.33-1.85 3.56 0 4.22 2.34 4.22 5.39v6.35zM5.34 7.44a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
+    <span>/in/gongtiejing</span>
+  </a>
   <div>|</div>
-  <div>GitHub：<a href="https://github.com/enxpower/mining" target="_blank" rel="noopener">https://github.com/enxpower/mining</a></div>
+  <a href="https://github.com/enxpower/mining" target="_blank" rel="noopener" title="GitHub">
+    <svg class="iconsvg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#111" d="M12 .5A11.5 11.5 0 0 0 .5 12.3c0 5.2 3.4 9.6 8 11.2.6.1.8-.2.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.6-1.4-2-1.4-2-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 3 1.3 3.8 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.4-1.3-5.4-6a4.6 4.6 0 0 1 1.2-3.2c-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.2 11.2 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.9.1 3.2a4.6 4.6 0 0 1 1.2 3.2c0 4.7-2.8 5.7-5.4 6 .4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.6-1.6 8-6 8-11.2A11.5 11.5 0 0 0 12 .5z"/></svg>
+    <span>enxpower/mining</span>
+  </a>
 </footer>
 
 <script>
 (function(){
+/* ────────── i18n ────────── */
+const i18n = {
+  en: {
+    title:"Off-Grid Mining Microgrid — 35 kV",
+    global:"Global", simHours:"Simulation length (hours)", dt:"Time step dt (s)", f0:"Nominal frequency f0 (Hz)", Dsys:"System damping D (pu)", alphaLoad:"Load freq-sensitivity α (%/Hz)",
+    start:"▶ Start", pause:"⏸ Pause", reset:"↺ Reset",
+    geo:"Geography / Insolation", preset:"Preset", custom:"Custom", arctic:"Arctic (φ≈70°N)", desert:"Desert (φ≈25°N)", africa:"Tropical Africa (φ≈10°N)", andes:"Andes (φ≈20°S)",
+    lat:"Latitude φ (°)", doy:"Day-of-year (1–365)", pvSoil:"PV soiling (0.7–1)",
+    load_ren:"Load / Renewables (0 to disable)", Pload:"Load baseline (MW)", loadVar:"Load variation (MW)",
+    PpvMax:"PV max (MW)", pvShape:"PV day-shape (1–3)", pvCloud:"Cloudiness (0–1)",
+    PwindMax:"Wind max (MW)", windMean:"Mean wind speed (m/s)", windVar:"Wind variability (0–1)",
+    diesel:"Diesel (VF)", dg33n:"3.3MW initial on-line (0–6)", dg12n:"1.25MW initial on-line (0–2)", Rdg:"Active power droop R\u209A (%)", dgMinPu:"Per-unit min load", rampUp:"Ramp up (MW/s)", rampDn:"Ramp down (MW/s)", dgDelay:"Start/stop delay (s)", dgHyst:"Start/stop hysteresis (MW)", allowOff:"Allow all-off", yes:"Yes", no:"No (keep ≥1 online)",
+    bess:"BESS (VSG)", soc0:"Initial SOC (%)", Rvsg:"Droop R\u209A (%)", Hvsg:"Virtual inertia H (s)", socTarget:"SOC target / band (% / %)", emg:"Emergency: |Δf| / overload× / window (Hz / × / s)",
+    prot:"Protection / Limiting", rocMax:"RoCoF max (Hz/s)", hzw:"Hz–W limit: k1(60.2–60.5)/k2(>60.5)", reclose:"Reclose after trip (s)",
+    view:"Window control (draggable)", viewHours:"Window length (hours)", viewStart:"Window start (hours)", followLive:"Follow live",
+    powerPlot:"Power (MW) · Window", freqPlot:"Frequency (Hz) / SOC (%) · Window",
+    leg_pv:"PV", leg_wind:"Wind", leg_load:"Load", leg_diesel:"Diesel", leg_bess:"BESS (+dis/−ch)", leg_sun:"Sunrise/Sunset", leg_freq:"Freq", leg_soc:"SOC", leg_f0:"f₀=60 Hz baseline",
+    metrics:"Metrics & Log", kpiFuel:"Fuel use", kpiFuelBase:"Fuel (diesel baseline)", kpiFuelSave:"Fuel saved", kpiRE:"Renewables share", kpiPVgen:"PV energy", kpiWDgen:"Wind energy", kpiCurt:"Curtailment (PV+Wind)", kpiN1:"N−1 check", kpiWin:"Recent window",
+    foot:"Microgrid EMS Sim · V2.4_geo"
+  },
+  zh: {
+    title:"离网矿区微电网 — 35 kV",
+    global:"全局", simHours:"仿真时长（小时）", dt:"步长 dt（秒）", f0:"名义频率 f0（Hz）", Dsys:"系统阻尼 D（pu）", alphaLoad:"负荷随频 α（%/Hz）",
+    start:"▶ 开始", pause:"⏸ 暂停", reset:"↺ 重置",
+    geo:"地理/日照", preset:"预设", custom:"自定义", arctic:"极寒（φ≈70°N）", desert:"沙漠（φ≈25°N）", africa:"非洲热带（φ≈10°N）", andes:"安第斯（φ≈20°S）",
+    lat:"纬度 φ（°）", doy:"年内日序（1–365）", pvSoil:"PV 污染/积尘（0.7–1）",
+    load_ren:"负载 / 可再生（设 0 即无）", Pload:"负载基线（MW）", loadVar:"负载波动幅度（MW）",
+    PpvMax:"PV 上限（MW）", pvShape:"PV 日形（1–3）", pvCloud:"云影强度（0–1）",
+    PwindMax:"风电上限（MW）", windMean:"平均风速（m/s）", windVar:"风速波动（0–1）",
+    diesel:"柴油（VF）", dg33n:"3.3MW 初始在网（0–6）", dg12n:"1.25MW 初始在网（0–2）", Rdg:"有功下垂 R\u209A（%）", dgMinPu:"单台最低负载（pu）", rampUp:"上调爬坡（MW/s）", rampDn:"下调爬坡（MW/s）", dgDelay:"启停延时（s）", dgHyst:"启停迟滞（MW）", allowOff:"允许全停", yes:"是", no:"否（至少1台在线）",
+    bess:"BESS（VSG）", soc0:"初始 SOC（%）", Rvsg:"下垂 R\u209A（%）", Hvsg:"虚拟惯量 H（s）", socTarget:"SOC 目标 / 窗口（% / %）", emg:"应急：|Δf| / 过载倍数 / 时间窗（Hz / × / s）",
+    prot:"保护/限功", rocMax:"RoCoF 限值（Hz/s）", hzw:"Hz–W 限功：k1(60.2–60.5)/k2(>60.5)", reclose:"跳闸后重合闸（s）",
+    view:"视窗控制（可滑动）", viewHours:"视窗长度（小时）", viewStart:"视窗起点（小时）", followLive:"跟随实时",
+    powerPlot:"功率（MW） · 视窗", freqPlot:"频率（Hz）/ SOC（%） · 视窗",
+    leg_pv:"PV", leg_wind:"Wind", leg_load:"Load", leg_diesel:"Diesel", leg_bess:"BESS（+放/−充）", leg_sun:"日出/日落", leg_freq:"Freq", leg_soc:"SOC", leg_f0:"f₀=60 Hz 基线",
+    metrics:"指标 & 日志", kpiFuel:"燃油消耗", kpiFuelBase:"燃油对照（全柴油）", kpiFuelSave:"燃油节省", kpiRE:"可再生占比", kpiPVgen:"PV 发电量", kpiWDgen:"Wind 发电量", kpiCurt:"弃电（PV+风）", kpiN1:"N−1 校核", kpiWin:"最近窗口",
+    foot:"Microgrid EMS Sim · V2.4_geo"
+  }
+};
+let currentLang='en';
+function applyI18n(){
+  document.documentElement.lang = currentLang==='zh'?'zh':'en';
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k=el.getAttribute('data-i18n'); const map=i18n[currentLang];
+    if(map[k]!=null) el.innerHTML = map[k];
+  });
+  document.getElementById('langBtn').textContent = currentLang==='en' ? 'EN | 中文' : '中文 | EN';
+}
+document.getElementById('langBtn').addEventListener('click', ()=>{
+  currentLang = (currentLang==='en') ? 'zh' : 'en';
+  applyI18n();
+});
+
 /* ────────── 工具 ────────── */
 const el=id=>document.getElementById(id);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -229,10 +289,9 @@ const PCTX=E.pPlot.getContext('2d'), FCTX=E.fPlot.getContext('2d');
 function logLine(s){E.log.textContent+=s+"\n";E.log.scrollTop=E.log.scrollHeight;}
 
 /* ────────── 状态 ────────── */
-let running=false, series=[], st={};
+let running=false, series=[], st={}, windowState=null;
 
 function initState(){
-  // f0 兜底，避免负频误解
   const f0_in=parseFloat(E.f0.value);
   const f0_safe=(isFinite(f0_in)&&f0_in>=40&&f0_in<=65)?f0_in:60;
 
@@ -305,15 +364,15 @@ function windSpeed(t){
 function windAvail(v){
   if(st.wind.Pmax<=0) return 0;const Pmax=st.wind.Pmax;
   if(v<3) return 0;if(v<12){const pu=(v-3)/(12-3);return Pmax*pu*pu;}
-  if(v<=25) return Pmax; if(st.wind.stopReset<=0){st.wind.stopReset=120;logLine(`${ts(st.t)} 风机切出`);} return 0;
+  if(v<=25) return Pmax; if(st.wind.stopReset<=0){st.wind.stopReset=120;logLine(`${ts(st.t)} Wind cut-out`);} return 0;
 }
 
 /* ────────── 保护/限功 ────────── */
 function limitREByFreq(Pavail,res,dt){
   const f=st.f;if(Pavail<=0) return 0;
   if(res.ofTrip>0){res.ofTrip-=dt;return 0;}
-  if(f>=st.of2f){res.ofDelay=(res._band===2?res.ofDelay+dt:dt);res._band=2;if(res.ofDelay>=st.of2t){res.ofTrip=st.reclose;res.ofDelay=0;res._band=0;logLine(`${ts(st.t)} OF2 跳闸`);return 0;}}
-  else if(f>=st.of1f){res.ofDelay=(res._band===1?res.ofDelay+dt:dt);res._band=1;if(res.ofDelay>=st.of1t){res.ofTrip=st.reclose;res.ofDelay=0;res._band=0;logLine(`${ts(st.t)} OF1 跳闸`);return 0;}}
+  if(f>=st.of2f){res.ofDelay=(res._band===2?res.ofDelay+dt:dt);res._band=2;if(res.ofDelay>=st.of2t){res.ofTrip=st.reclose;res.ofDelay=0;res._band=0;logLine(`${ts(st.t)} OF2 trip`);return 0;}}
+  else if(f>=st.of1f){res.ofDelay=(res._band===1?res.ofDelay+dt:dt);res._band=1;if(res.ofDelay>=st.of1t){res.ofTrip=st.reclose;res.ofDelay=0;res._band=0;logLine(`${ts(st.t)} OF1 trip`);return 0;}}
   else {res.ofDelay=Math.max(0,res.ofDelay-2*dt);res._band=0;}
   let scale=1; if(f>60.2){ if(f<60.5) scale=Math.max(0,1-st.kof1*(f-60.0));
     else scale=Math.max(0,1-st.kof1*0.5-st.kof2*(f-60.5)); }
@@ -340,8 +399,8 @@ function dieselDispatch(dt,fpu,residual){
   if(onlineCap<desiredCap-upH){if(!startOne("DG3.3")) startOne("DG1.25");}
   else if(onlineCap-desiredCap>dnH && !st.freezeReduce && st.bess.E/st.bess.Emax>0.3){stopOne();}
   for(const x of u){
-    if(x.starting){x.timer-=dt;if(x.timer<=0){x.starting=false;x.online=true;x.P=x.cap*0.65;logLine(`${ts(st.t)} 并网完成：${x.type}`);}}
-    if(x.stopping){x.P=Math.max(0,x.P-st.dg.rampDn*dt*1.5);x.timer-=dt;if(x.timer<=0){x.stopping=false;x.online=false;x.P=0;logLine(`${ts(st.t)} 解列完成：${x.type}`);}}
+    if(x.starting){x.timer-=dt;if(x.timer<=0){x.starting=false;x.online=true;x.P=x.cap*0.65;logLine(`${ts(st.t)} Sync in: ${x.type}`);}}
+    if(x.stopping){x.P=Math.max(0,x.P-st.dg.rampDn*dt*1.5);x.timer-=dt;if(x.timer<=0){x.stopping=false;x.online=false;x.P=0;logLine(`${ts(st.t)} Island off: ${x.type}`);}}
   }
   const online=u.filter(x=>x.online);const PdgMax=online.reduce((a,x)=>a+x.cap,0);
   const droopAdj=-fpu/Math.max(0.001,st.dg.Rdg)*PdgMax;
@@ -355,9 +414,9 @@ function dieselDispatch(dt,fpu,residual){
   return online.reduce((a,x)=>a+x.P,0);
 
   function startOne(type){const c=u.find(x=>!x.online && !x.starting && x.type===type);
-    if(c){c.starting=true;c.timer=st.dg.delay;logLine(`${ts(st.t)} 启动命令：${type}`);return true;} return false;}
+    if(c){c.starting=true;c.timer=st.dg.delay;logLine(`${ts(st.t)} Start cmd: ${type}`);return true;} return false;}
   function stopOne(){const c=u.find(x=>x.online && !x.stopping && !x.starting && x.P<x.cap*0.6);
-    if(c){c.stopping=true;c.timer=st.dg.delay;logLine(`${ts(st.t)} 解列命令：${c.type}`);return true;} return false;}
+    if(c){c.stopping=true;c.timer=st.dg.delay;logLine(`${ts(st.t)} Stop cmd: ${c.type}`);return true;} return false;}
 }
 
 /* 燃油（真实） */
@@ -377,46 +436,16 @@ function fuelLH(fleet){
 
 /* —— 动态节油对照：全柴油最优近似 —— */
 function baselineFuelLitersPerHour(Pload){
-  const units=[];
-  for(let i=0;i<6;i++) units.push({cap:3.3});
-  for(let i=0;i<2;i++) units.push({cap:1.25});
-  const minPu=st.dg.minPu;
-
-  if(Pload<=0) return 0;
-
+  const units=[]; for(let i=0;i<6;i++) units.push({cap:3.3}); for(let i=0;i<2;i++) units.push({cap:1.25});
+  const minPu=st.dg.minPu; if(Pload<=0) return 0;
   units.sort((a,b)=>b.cap-a.cap);
-  let chosen=[];
-  let sumCap=0;
-  const targetPu=0.7;
-
-  for(const u of units){
-    chosen.push({cap:u.cap,P:0});
-    sumCap+=u.cap;
-    let per= Pload/Math.max(sumCap,1e-6);
-    if(sumCap>=Pload && per<=0.9) break;
-  }
-
-  if(sumCap<Pload){ /* 所有机组都上 */ }
-
-  const n=chosen.length;
-  let per=Math.max(Pload/sumCap, minPu);
-  per=Math.min(per, 0.95);
-  per = clamp(Math.max(per, targetPu-0.1), minPu, 0.95);
-
+  let chosen=[], sumCap=0; const targetPu=0.7;
+  for(const u of units){ chosen.push({cap:u.cap,P:0}); sumCap+=u.cap; let per=Pload/Math.max(sumCap,1e-6); if(sumCap>=Pload && per<=0.9) break; }
+  const n=chosen.length; let per=Math.max(Pload/sumCap, minPu); per=Math.min(per, 0.95); per = clamp(Math.max(per, targetPu-0.1), minPu, 0.95);
   let Lh=0, rho=0.84;
-  for(const x of chosen){
-    const P = per*x.cap;
-    const pu = per;
-    const kW = P*1000;
-    const kgph=(sfc_g_per_kWh(pu)/1000)*kW;
-    Lh += kgph/rho;
-  }
+  for(const x of chosen){ const P = per*x.cap; const kW = P*1000; const kgph=(sfc_g_per_kWh(per)/1000)*kW; Lh += kgph/rho; }
   const supplied = chosen.reduce((a,x)=>a+per*x.cap,0);
-  if(Pload>supplied){
-    const extraKW=(Pload-supplied)*1000;
-    const kgph=(200/1000)*extraKW;
-    Lh += kgph/rho;
-  }
+  if(Pload>supplied){ const extraKW=(Pload-supplied)*1000; const kgph=(200/1000)*extraKW; Lh += kgph/rho; }
   return Lh; // L/h
 }
 
@@ -432,8 +461,8 @@ function bessControl(dt,fpu,Pinj_pre){
   const soft=0.08;if(soc<soft) Pcmd=Math.min(Pcmd,0);if(soc>1-soft) Pcmd=Math.max(Pcmd,0);
   st.bess.P=clamp(Pcmd,-PmaxEff,PmaxEff);
   if(PmaxEff>Pmax && Math.abs(st.bess.P)>Pmax){st.bess.emgLeft=Math.max(0,st.bess.emgLeft-dt);
-    if(st.bess.emgLeft===0) logLine(`${ts(st.t)} BESS 应急时间用尽`);
-  }else{st.bess.emgLeft=Math.min(st.bess.overSec, st.bess.emgLeft+0.3*dt);}
+    if(st.bess.emgLeft===0) logLine(`${ts(st.t)} BESS emergency window exhausted`);}
+  else{st.bess.emgLeft=Math.min(st.bess.overSec, st.bess.emgLeft+0.3*dt);}
 }
 
 /* ────────── step ────────── */
@@ -468,9 +497,14 @@ function step(){
   dfdt=clamp(dfdt,-st.rocMax,st.rocMax);
   st.f+=dfdt*dt;
 
-  // 能量去向
+  // 能量去向：优先负荷 -> 余量充电 -> 剩余弃电
   let remain=Pload, pv2L=Math.min(Ppv,remain); remain-=pv2L;
   let wind2L=Math.min(Pwind,remain); remain-=wind2L;
+
+  // ✅ 累加可再生“直供负荷”的能量（用于占比）
+  st.pvDir   += pv2L   * dt/3600;
+  st.windDir += wind2L * dt/3600;
+
   const Pb=st.bess.P;
   const chargeCap=Math.max(0,-Pb);
   const surplus=Math.max(0,(Ppv-pv2L)+(Pwind-wind2L));
@@ -488,25 +522,29 @@ function step(){
   const Lh_base = baselineFuelLitersPerHour(Pload);
   st.fuelBaselineL += Lh_base * dt/3600;
 
-  if(Math.abs(st.f-st.f0)>0.5){ if(!st.freezeReduce){st.freezeReduce=true;st.freezeTimer=300;logLine(`${ts(st.t)} 频率越限，冻结减机 5min`);} }
+  if(Math.abs(st.f-st.f0)>0.5){ if(!st.freezeReduce){st.freezeReduce=true;st.freezeTimer=300;logLine(`${ts(st.t)} |Δf|>0.5 → freeze stop for 5min`);} }
   if(st.freezeTimer>0){st.freezeTimer-=dt;if(st.freezeTimer<=0) st.freezeReduce=false;}
 
   series.push({t:st.t,Ppv,Pwind,Pload,Pdg,Pb:st.bess.P,f:st.f,soc:100*(st.bess.Emax>0?st.bess.E/st.bess.Emax:0)});
   st.t+=dt;
 }
 
-/* ────────── 绘图 ────────── */
-function currentWindow(){
+/* ────────── 共享视窗（保证两个图时间轴完全一致） ────────── */
+function computeWindow(){
   const Hwin=Math.min(+E.viewHours.value,+E.simHours.value);
   let Hstart=+E.viewStart.value; const Hsim=+E.simHours.value;
   if(E.followLive.checked){const tH=st.t/3600; Hstart=clamp(tH-Hwin,0,Math.max(0,Hsim-Hwin)); E.viewStart.value=String(Hstart);}
   E.viewStart.max=String(Math.max(0,Hsim-Hwin));
-  return {t0:Hstart*3600,t1:(Hstart+Hwin)*3600,Hwin,Hstart};
+  // 统一 tick 个数
+  const ticks=Math.max(3,Math.round(Hwin));
+  return {t0:Hstart*3600,t1:(Hstart+Hwin)*3600,Hwin,Hstart,ticks};
 }
 function updateViewLabel(){
   const Hwin=+E.viewHours.value,Hstart=+E.viewStart.value;
-  el('viewLabel').textContent=`[${Hstart.toFixed(1)}, ${(Hstart+Hwin).toFixed(1)}] h`;
+  E.viewLabel.textContent=`[${Hstart.toFixed(1)}, ${(Hstart+Hwin).toFixed(1)}] h`;
 }
+
+/* ────────── 绘图 ────────── */
 function drawSeries(ctx,w,h,xs,ys,color,dashed=false,width=2.5){
   ctx.beginPath(); if(dashed) ctx.setLineDash([6,6]); else ctx.setLineDash([]);
   for(let i=0;i<xs.length;i++){ if(i===0) ctx.moveTo(xs[i],ys[i]); else ctx.lineTo(xs[i],ys[i]); }
@@ -521,12 +559,12 @@ function drawSunMarkers(ctx,w,h,t0,t1){
       ctx.fillStyle='#92400e'; ctx.font=`${10*(window.devicePixelRatio||1)}px sans-serif`; ctx.fillText(`${(t/3600).toFixed(1)}h`,x-12,30); ctx.fillStyle='#f59e0b';}
   });
 }
-function plotPower(){
+function plotPower(ws){
   const DPR=window.devicePixelRatio||1;
   const w=E.pPlot.width=Math.floor(E.pPlot.clientWidth*DPR);
   const h=E.pPlot.height=Math.floor(E.pPlot.clientHeight*DPR);
   const ctx=PCTX; ctx.clearRect(0,0,w,h); if(series.length<2) return;
-  const {t0,t1,Hwin}=currentWindow(); const seg=series.filter(d=>d.t>=t0&&d.t<=t1); if(seg.length<2) return;
+  const {t0,t1,ticks}=ws; const seg=series.filter(d=>d.t>=t0&&d.t<=t1); if(seg.length<2) return;
   const xs=seg.map(d=>((d.t-t0)/(t1-t0))*(w-60)+40);
   const allP=seg.flatMap(d=>[d.Ppv,d.Pwind,d.Pload,d.Pdg,d.Pb]);
   const pmin=Math.min(0,...allP), pmax=Math.max(...allP,1);
@@ -541,15 +579,15 @@ function plotPower(){
   drawSeries(ctx,w,h,xs,segMap('Pdg'),COLORS.diesel);
   drawSeries(ctx,w,h,xs,segMap('Pb'),COLORS.bess);
   drawSunMarkers(ctx,w,h,t0,t1);
-  ctx.fillStyle='#374151'; ctx.font=`${11*DPR}px sans-serif`; const ticks=Math.max(3,Math.round(Hwin));
+  ctx.fillStyle='#374151'; ctx.font=`${11*DPR}px sans-serif`;
   for(let k=0;k<=ticks;k++){const tk=t0+(k/ticks)*(t1-t0),x=40+(k/ticks)*(w-60);ctx.fillText(`${(tk/3600).toFixed(1)}h`,x-14,h-6);}
 }
-function plotFreq(){
+function plotFreq(ws){
   const DPR=window.devicePixelRatio||1;
   const w=E.fPlot.width=Math.floor(E.fPlot.clientWidth*DPR);
   const h=E.fPlot.height=Math.floor(E.fPlot.clientHeight*DPR);
   const ctx=FCTX; ctx.clearRect(0,0,w,h); if(series.length<2) return;
-  const {t0,t1,Hwin}=currentWindow(); const seg=series.filter(d=>d.t>=t0&&d.t<=t1); if(seg.length<2) return;
+  const {t0,t1,ticks}=ws; const seg=series.filter(d=>d.t>=t0&&d.t<=t1); if(seg.length<2) return;
   const xs=seg.map(d=>((d.t-t0)/(t1-t0))*(w-60)+40);
   const fVals=seg.map(d=>d.f), sVals=seg.map(d=>d.soc); const f0=st.f0;
   let fmin=Math.min(...fVals,f0-0.8), fmax=Math.max(...fVals,f0+0.8);
@@ -558,17 +596,17 @@ function plotFreq(){
   ctx.strokeStyle='#f3f4f6'; ctx.lineWidth=1; for(let i=0;i<5;i++){const yy=(i/4)*(h-36)+18; ctx.beginPath(); ctx.moveTo(40,yy); ctx.lineTo(w-12,yy); ctx.stroke();}
   const y60=yF(f0); ctx.beginPath(); ctx.moveTo(40,y60); ctx.lineTo(w-12,y60); ctx.setLineDash([]); ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1; ctx.stroke();
   ctx.fillStyle='#6b7280'; ctx.font=`${10*DPR}px sans-serif`; ctx.fillText('60 Hz', 44, y60-4);
-  const xsF=xs; drawSeries(ctx,w,h,xsF,fVals.map(yF),COLORS.freq);
-  drawSeries(ctx,w,h,xsF,sVals.map(yS),'#009E73',true);
+  drawSeries(ctx,w,h,xs,fVals.map(yF),COLORS.freq);
+  drawSeries(ctx,w,h,xs,sVals.map(yS),'#009E73',true);
   const last=series[series.length-1]; const df = last.f - st.f0;
   E.live.textContent=`t=${(last.t/3600).toFixed(2)} h | f=${last.f.toFixed(3)} Hz | Δf=${(df>=0?'+':'')}${df.toFixed(3)} Hz | PV=${last.Ppv.toFixed(2)} MW | Wind=${last.Pwind.toFixed(2)} MW | Diesel=${last.Pdg.toFixed(2)} MW | BESS=${last.Pb.toFixed(2)} MW | SOC=${last.soc.toFixed(1)}% | Load=${last.Pload.toFixed(2)} MW`;
-  ctx.fillStyle='#374151'; ctx.font=`${11*DPR}px sans-serif`; const ticks=Math.max(3,Math.round(Hwin));
+  ctx.fillStyle='#374151'; ctx.font=`${11*DPR}px sans-serif`;
   for(let k=0;k<=ticks;k++){const tk=t0+(k/ticks)*(t1-t0),x=40+(k/ticks)*(w-60);ctx.fillText(`${(tk/3600).toFixed(1)}h`,x-14,h-6);}
   if(seg.length>2){
     const fmaxSeg=Math.max(...seg.map(d=>d.f));
     const fminSeg=Math.min(...seg.map(d=>d.f));
     const pbMax=Math.max(...seg.map(d=>Math.abs(d.Pb)));
-    E.kpiWin.textContent=`窗口 f∈[${fminSeg.toFixed(2)}, ${fmaxSeg.toFixed(2)}] Hz · |BESS|_max=${pbMax.toFixed(2)} MW`;
+    E.kpiWin.textContent=`f∈[${fminSeg.toFixed(2)}, ${fmaxSeg.toFixed(2)}] Hz · |BESS|_max=${pbMax.toFixed(2)} MW`;
   }
 }
 
@@ -584,20 +622,33 @@ function refreshKPI(){
   E.kpiPVgen.textContent=fmt(st.pv.genWh,"MWh");
   E.kpiWDgen.textContent=fmt(st.wind.genWh,"MWh");
 }
-function loop(){ if(!running) return; step(); plotPower(); plotFreq(); refreshKPI(); requestAnimationFrame(loop); }
+function loop(){
+  if(!running) return;
+  step();
+  windowState = computeWindow();   // ✅ 先算一次共享窗口
+  plotPower(windowState);          // ✅ 两图共用同一窗口和刻度
+  plotFreq(windowState);
+  refreshKPI();
+  requestAnimationFrame(loop);
+}
 
 /* ────────── 交互 ────────── */
 E.startBtn.onclick=()=>{ if(!running){ if(series.length===0) initState(); running=true; requestAnimationFrame(loop);} };
 E.pauseBtn.onclick=()=>{ running=false; };
-E.resetBtn.onclick=()=>{ running=false; initState(); plotPower(); plotFreq(); refreshKPI(); };
-function onViewChange(){ updateViewLabel(); plotPower(); plotFreq(); }
+E.resetBtn.onclick=()=>{ running=false; initState(); windowState=computeWindow(); plotPower(windowState); plotFreq(windowState); refreshKPI(); };
+function onViewChange(){ updateViewLabel(); windowState=computeWindow(); plotPower(windowState); plotFreq(windowState); }
 E.viewHours.addEventListener('input', onViewChange);
 E.viewStart.addEventListener('input', ()=>{ E.followLive.checked=false; onViewChange(); });
 E.followLive.addEventListener('change', onViewChange);
-window.addEventListener('resize', ()=>{ plotPower(); plotFreq(); });
+window.addEventListener('resize', ()=>{ windowState=computeWindow(); plotPower(windowState); plotFreq(windowState); });
 
 /* ────────── 启动 ────────── */
-initState(); plotPower(); plotFreq(); refreshKPI();
+initState();
+applyI18n();
+windowState=computeWindow();
+plotPower(windowState);
+plotFreq(windowState);
+refreshKPI();
 
 })();
 </script>

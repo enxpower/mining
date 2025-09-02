@@ -5,293 +5,206 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Off-Grid Mining Microgrid · V2.4_geo · Fuel-Saving Baseline</title>
 <style>
-  :root{
-    --fg:#0f172a; --muted:#64748b; --box:#e2e8f0; --bg:#f8fafc; --card:#ffffff;
-    --brand:#2563eb; --brand-2:#0ea5e9; --border:#e5e7eb; --line:#f1f5f9;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --fg:#e5e7eb; --muted:#94a3b8; --box:#334155; --bg:#0b1220; --card:#0f172a;
-      --brand:#60a5fa; --brand-2:#22d3ee; --border:#1f2937; --line:#1f2937;
-    }
-    body{background: radial-gradient(1200px 600px at 10% -10%, rgba(37,99,235,.18), transparent 45%), #0b1220;}
-    .legend{background:rgba(15,23,42,0.92); border-color:#334155}
-  }
+  :root{--fg:#111;--muted:#666;--box:#d1d5db}
   *{box-sizing:border-box}
-  body{
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans",sans-serif;
-    color:var(--fg); margin:0; background:var(--bg);
-  }
-  .wrap{max-width:1200px; margin:16px auto; padding:0 12px}
-  h1{
-    font-size:20px; margin:0;
-    background:linear-gradient(90deg,var(--fg),var(--brand-2));
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-  }
-  .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0 10px}
-  .kv{font-family:ui-monospace,Menlo,Consolas,monospace}
-  .badge{display:inline-block;border:1px solid var(--border);padding:2px 8px;border-radius:999px;color:var(--muted)}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans",sans-serif;color:var(--fg);margin:14px}
+  h1{font-size:18px;margin:0 0 8px}
   .row{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0}
-  .card{
-    border:1px solid var(--box);border-radius:12px;padding:12px;background:var(--card);flex:1 1 320px;
-    box-shadow:0 1px 2px rgba(2,6,23,0.06);
-  }
-  .card b{color:var(--muted)}
-  label{display:block;font-size:12px;margin:6px 0 4px;color:var(--muted)}
-  input[type=number],input[type=range],select{
-    width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--fg)
-  }
+  .card{border:1px solid var(--box);border-radius:10px;padding:12px;background:#fff;flex:1 1 320px}
+  label{display:block;font-size:12px;margin:6px 0 3px}
+  input[type=number],input[type=range],select{width:100%;padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px}
   input[type=range]{height:32px;padding:0}
-  .btn{padding:8px 14px;border:1px solid var(--brand);border-radius:10px;background:rgba(37,99,235,0.06);cursor:pointer;color:var(--fg)}
-  .btn.primary{background:linear-gradient(180deg,rgba(37,99,235,.18),rgba(14,165,233,.18));border-color:transparent}
-  .btn.secondary{border-color:var(--border);background:transparent;color:var(--fg)}
-  .btn:active{transform:translateY(1px)}
-  canvas{
-    width:100%;height:300px;background:#fff;border:1px solid var(--border);border-radius:12px;display:block
-  }
-  @media (max-width:640px){
-    canvas{height:240px}
-  }
+  .btn{padding:8px 12px;border:1px solid #111;border-radius:8px;background:#fff;cursor:pointer}
+  .btn.secondary{border-color:#666;color:#333}
+  .kv{font-family:ui-monospace,Menlo,Consolas,monospace}
+  canvas{width:100%;height:280px;background:#fff;border:1px solid #eee;border-radius:10px;display:block} /* ← 加固 */
   .kpi{display:flex;gap:10px;flex-wrap:wrap}
-  .kpi .box{border:1px solid var(--box);border-radius:12px;padding:10px 12px;min-width:150px;background:linear-gradient(180deg,rgba(148,163,184,.06),transparent)}
-  .kpi .box b{display:block;font-size:12px;color:var(--muted)}
+  .kpi .box{border:1px solid var(--box);border-radius:10px;padding:8px 10px;min-width:150px}
+  .kpi .box b{display:block;font-size:12px;color:#374151}
   .kpi .box span{display:block;font-size:18px;margin-top:2px}
-  #log{
-    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;max-height:180px;overflow:auto;
-    border:1px solid var(--border);border-radius:10px;padding:10px;background:rgba(148,163,184,.08);
-    white-space:pre-wrap;line-height:1.35
-  }
-  .legend{
-    position:absolute; right:14px; top:10px; background:rgba(255,255,255,0.9);
-    border:1px solid var(--border); border-radius:10px; padding:6px 8px; font-size:12px
-  }
+  #log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;max-height:180px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px;background:#fafafa;white-space:pre-wrap;line-height:1.35}
+  .legend{position:absolute; right:14px; top:10px; background:rgba(255,255,255,0.92); border:1px solid #e5e7eb; border-radius:8px; padding:6px 8px; font-size:12px}
   .legend-row{display:flex;align-items:center;gap:6px;margin:2px 0}
-  .swatch{width:16px;height:3px;background:#000;border-radius:2px}
+  .swatch{width:16px;height:3px;background:#000}
   .dash{background:linear-gradient(90deg,#000 0 40%,transparent 40% 60%,#000 60% 100%)}
   .dash2{background:linear-gradient(90deg,#000 0 30%,transparent 30% 55%,#000 55% 100%)}
   .stack{position:relative}
-  footer{
-    margin:14px 0 30px;padding-top:12px;border-top:1px dashed var(--border);color:var(--muted);font-size:12px;
-    display:flex;gap:14px;flex-wrap:wrap;align-items:center
-  }
-  footer a{color:var(--brand);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  footer{margin-top:14px;padding-top:10px;border-top:1px dashed #e5e7eb;color:#6b7280;font-size:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  footer a{color:#2563eb;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
   .iconsvg{width:16px;height:16px;display:inline-block}
-  .langbtn{font-size:12px;border:1px solid var(--border);border-radius:10px;padding:7px 12px;background:transparent;cursor:pointer}
-  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .langbtn{font-size:12px;border:1px solid #ddd;border-radius:8px;padding:6px 10px;background:#fff;cursor:pointer}
   /* ✅ 防抖动：固定 live 行高 + 禁止换行 + 省略号 */
   #live{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:1.5em}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="topbar">
-    <div>
-      <h1><span data-i18n="title">Off-Grid Mining Microgrid — 35 kV</span> · <span class="kv">V2.4_geo</span></h1>
-      <span class="badge">Fuel-Saving Baseline</span>
-    </div>
-    <button id="langBtn" class="langbtn">EN | 中文</button>
-  </div>
-
-  <!-- Global & Geo -->
-  <div class="row">
-    <div class="card">
-      <b data-i18n="global">Global</b>
-      <label><span data-i18n="simHours">Simulation length (hours)</span></label><input id="simHours" type="number" value="24" step="1" min="1">
-      <label><span data-i18n="dt">Time step dt (s)</span></label><input id="dt" type="number" value="0.5" step="0.1" min="0.05">
-      <label><span data-i18n="f0">Nominal frequency f0 (Hz)</span></label><input id="f0" type="number" value="60" step="1" min="40" max="65">
-      <label><span data-i18n="Dsys">System damping D (pu)</span></label><input id="Dsys" type="number" value="2.2" step="0.1">
-      <label><span data-i18n="alphaLoad">Load freq-sensitivity α (%/Hz)</span></label><input id="alphaLoad" type="number" value="2.0" step="0.1">
-      <div class="toolbar">
-        <button class="btn primary" id="startBtn" data-i18n="start">▶ Start</button>
-        <button class="btn secondary" id="pauseBtn" data-i18n="pause">⏸ Pause</button>
-        <button class="btn secondary" id="resetBtn" data-i18n="reset">↺ Reset</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <b data-i18n="geo">Geography / Insolation</b>
-      <label><span data-i18n="preset">Preset</span></label>
-      <select id="geoPreset">
-        <option value="custom" selected data-i18n="custom">Custom</option>
-        <option value="arctic" data-i18n="arctic">Arctic (φ≈70°N)</option>
-        <option value="desert" data-i18n="desert">Desert (φ≈25°N)</option>
-        <option value="africa" data-i18n="africa">Tropical Africa (φ≈10°N)</option>
-        <option value="andes" data-i18n="andes">Andes (φ≈20°S)</option>
-      </select>
-      <label><span data-i18n="lat">Latitude φ (°)</span></label><input id="latDeg" type="number" value="25" step="0.5" min="-75" max="75">
-      <label><span data-i18n="doy">Day-of-year (1–365)</span></label><input id="doy" type="number" value="172" step="1" min="1" max="365">
-      <label><span data-i18n="pvSoil">PV soiling (0.7–1)</span></label><input id="pvSoil" type="number" value="0.9" step="0.01" min="0.7" max="1">
-    </div>
-
-    <div class="card">
-      <b data-i18n="load_ren">Load / Renewables (0 to disable)</b>
-      <label><span data-i18n="Pload">Load baseline (MW)</span></label><input id="Pload" type="number" value="12" step="0.5" min="0">
-      <label><span data-i18n="loadVar">Load variation (MW)</span></label><input id="loadVar" type="number" value="1.2" step="0.2" min="0">
-      <hr style="border:0;border-top:1px solid var(--border);margin:8px 0">
-      <label><span data-i18n="PpvMax">PV max (MW)</span></label><input id="PpvMax" type="number" value="30" step="1" min="0">
-      <label><span data-i18n="pvShape">PV day-shape (1–3)</span></label><input id="pvShape" type="number" value="1.5" step="0.1" min="1" max="3">
-      <label><span data-i18n="pvCloud">Cloudiness (0–1)</span></label><input id="pvCloud" type="number" value="0.35" step="0.05" min="0" max="1">
-      <hr style="border:0;border-top:1px solid var(--border);margin:8px 0">
-      <label><span data-i18n="PwindMax">Wind max (MW)</span></label><input id="PwindMax" type="number" value="6" step="1" min="0">
-      <label><span data-i18n="windMean">Mean wind speed (m/s)</span></label><input id="windMean" type="number" value="8" step="0.5" min="0">
-      <label><span data-i18n="windVar">Wind variability (0–1)</span></label><input id="windVar" type="number" value="0.4" step="0.05" min="0" max="1">
-    </div>
-
-    <div class="card">
-      <b data-i18n="diesel">Diesel (VF)</b>
-      <label><span data-i18n="dg33n">3.3MW initial on-line (0–6)</span></label><input id="dg33n" type="number" value="3" step="1" min="0" max="6">
-      <label><span data-i18n="dg12n">1.25MW initial on-line (0–2)</span></label><input id="dg12n" type="number" value="0" step="1" min="0" max="2">
-      <label><span data-i18n="Rdg">Active power droop R<sub>P</sub> (%)</span></label><input id="Rdg" type="number" value="4" step="0.5">
-      <label><span data-i18n="dgMinPu">Per-unit min load</span></label><input id="dgMinPu" type="number" value="0.35" step="0.05">
-      <label><span data-i18n="rampUp">Ramp up (MW/s)</span></label><input id="rampUp" type="number" value="0.2" step="0.05">
-      <label><span data-i18n="rampDn">Ramp down (MW/s)</span></label><input id="rampDn" type="number" value="1.0" step="0.1">
-      <label><span data-i18n="dgDelay">Start/stop delay (s)</span></label><input id="dgDelay" type="number" value="600" step="30">
-      <label><span data-i18n="dgHyst">Start/stop hysteresis (MW)</span></label><input id="dgHyst" type="number" value="1.5" step="0.1">
-      <label><span data-i18n="allowOff">Allow all-off</span></label>
-      <select id="allowDieselOff"><option value="false" selected data-i18n="no">No (keep ≥1 online)</option><option value="true" data-i18n="yes">Yes</option></select>
-    </div>
-
-    <div class="card">
-      <b data-i18n="bess">BESS (VSG)</b>
-      <label><span>P<sub>max</sub> (MW)</span></label><input id="PbMax" type="number" value="8" step="0.5" min="0">
-      <label><span>E<sub>max</sub> (MWh)</span></label><input id="EbMax" type="number" value="20" step="1" min="0">
-      <label><span data-i18n="soc0">Initial SOC (%)</span></label><input id="soc0" type="number" value="60" step="1" min="0" max="100">
-      <label><span data-i18n="Rvsg">Droop R<sub>P</sub> (%)</span></label><input id="Rvsg" type="number" value="3" step="0.5">
-      <label><span data-i18n="Hvsg">Virtual inertia H (s)</span></label><input id="Hvsg" type="number" value="6.0" step="0.1">
-      <label><span data-i18n="socTarget">SOC target / band (% / %)</span></label>
-      <div class="row" style="gap:8px"><input id="socTarget" type="number" value="55"><input id="socBand" type="number" value="10"></div>
-      <label><span data-i18n="emg">Emergency: |Δf| / overload× / window (Hz / × / s)</span></label>
-      <div class="row" style="gap:8px"><input id="femg" type="number" value="0.2" step="0.05"><input id="overMul" type="number" value="1.4" step="0.1"><input id="overSec" type="number" value="8" step="1"></div>
-    </div>
-
-    <div class="card">
-      <b data-i18n="prot">Protection / Limiting</b>
-      <label><span data-i18n="rocMax">RoCoF max (Hz/s)</span></label><input id="rocMax" type="number" value="0.9" step="0.1">
-      <label><span data-i18n="hzw">Hz–W limit: k1(60.2–60.5)/k2(&gt;60.5)</span></label>
-      <div class="row" style="gap:8px"><input id="kof1" type="number" value="0.5" step="0.1"><input id="kof2" type="number" value="2.0" step="0.1"></div>
-      <label><span>OF1 thresh (Hz)/time (s)</span></label>
-      <div class="row" style="gap:8px"><input id="of1f" type="number" value="60.5" step="0.1"><input id="of1t" type="number" value="10" step="1"></div>
-      <label><span>OF2 thresh (Hz)/time (s)</span></label>
-      <div class="row" style="gap:8px"><input id="of2f" type="number" value="61.0" step="0.1"><input id="of2t" type="number" value="0.2" step="0.1"></div>
-      <label><span data-i18n="reclose">Reclose after trip (s)</span></label><input id="reclose" type="number" value="30" step="1">
-    </div>
-  </div>
-
-  <!-- Window control -->
-  <div class="row">
-    <div class="card" style="flex:1 1 420px">
-      <b data-i18n="view">Window control (draggable)</b>
-      <label><span data-i18n="viewHours">Window length (hours)</span></label><input id="viewHours" type="number" value="4" step="0.5" min="0.5">
-      <label><span data-i18n="viewStart">Window start (hours)</span></label><input id="viewStart" type="range" min="0" max="20" step="0.1" value="0">
-      <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
-        <label style="display:flex;align-items:center;gap:6px"><input id="followLive" type="checkbox" checked> <span data-i18n="followLive">Follow live</span></label>
-        <span class="kv" id="viewLabel">[0.0, 4.0] h</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Plots -->
-  <div class="row">
-    <div class="card stack" style="flex:2 1 560px">
-      <b data-i18n="powerPlot">Power (MW) · Window</b>
-      <div class="legend">
-        <div class="legend-row"><div class="swatch" style="background:#E69F00"></div><span data-i18n="leg_pv">PV</span></div>
-        <div class="legend-row"><div class="swatch dash2" style="background-image:linear-gradient(90deg,#D55E00 0 30%,transparent 30% 55%,#D55E00 55% 100%)"></div><span data-i18n="leg_wind">Wind</span></div>
-        <div class="legend-row"><div class="swatch" style="background:#374151"></div><span data-i18n="leg_load">Load</span></div>
-        <div class="legend-row"><div class="swatch" style="background:#0072B2"></div><span data-i18n="leg_diesel">Diesel</span></div>
-        <div class="legend-row"><div class="swatch dash" style="background-image:linear-gradient(90deg,#009E73 0 40%,transparent 40% 60%,#009E73 60% 100%)"></div><span data-i18n="leg_bess">BESS (+dis/−ch)</span></div>
-        <div class="legend-row"><div class="swatch" style="background:#f59e0b;height:8px;width:8px;border-radius:50%"></div><span data-i18n="leg_sun">Sunrise/Sunset</span></div>
-      </div>
-      <canvas id="pPlot"></canvas>
-    </div>
-    <div class="card stack" style="flex:1 1 340px">
-      <b data-i18n="freqPlot">Frequency (Hz) / SOC (%) · Window</b>
-      <div class="legend">
-        <div class="legend-row"><div class="swatch" style="background:#6A3D9A"></div><span data-i18n="leg_freq">Freq</span></div>
-        <div class="legend-row"><div class="swatch dash" style="background-image:linear-gradient(90deg,#009E73 0 40%,transparent 40% 60%,#009E73 60% 100%)"></div><span data-i18n="leg_soc">SOC</span></div>
-        <div class="legend-row"><div class="swatch" style="background:#9ca3af;height:2px;width:18px"></div><span data-i18n="leg_f0">f₀=60 Hz baseline</span></div>
-      </div>
-      <canvas id="fPlot"></canvas>
-      <div id="live" class="kv" style="margin-top:6px"></div>
-    </div>
-  </div>
-
-  <!-- KPI & Log -->
-  <div class="card">
-    <b data-i18n="metrics">Metrics & Log</b>
-    <div class="kpi" id="kpiRow">
-      <div class="box"><b data-i18n="kpiFuel">Fuel use</b><span id="kpiFuel">0 L</span></div>
-      <div class="box"><b data-i18n="kpiFuelBase">Fuel (diesel baseline)</b><span id="kpiFuelBase">0 L</span></div>
-      <div class="box"><b data-i18n="kpiFuelSave">Fuel saved</b><span id="kpiFuelSave">0 L</span></div>
-      <div class="box"><b data-i18n="kpiRE">Renewables share</b><span id="kpiRE">0%</span></div>
-      <div class="box"><b data-i18n="kpiPVgen">PV energy</b><span id="kpiPVgen">0 MWh</span></div>
-      <div class="box"><b data-i18n="kpiWDgen">Wind energy</b><span id="kpiWDgen">0 MWh</span></div>
-      <div class="box"><b data-i18n="kpiCurt">Curtailment (PV+Wind)</b><span id="kpiCurt">0 MWh</span></div>
-      <div class="box"><b data-i18n="kpiN1">N−1 check</b><span id="kpiN1">OK</span></div>
-      <div class="box"><b data-i18n="kpiWin">Recent window</b><span id="kpiWin">—</span></div>
-    </div>
-    <div id="log"></div>
-  </div>
-
-  <footer>
-    <div>© <span data-i18n="foot">Microgrid EMS Sim · V2.4_geo</span></div>
-    <div>|</div>
-    <a href="https://www.linkedin.com/in/gongtiejing" target="_blank" rel="noopener" title="LinkedIn">
-      <svg class="iconsvg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0A66C2" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.95v5.66H9.36V9h3.41v1.56h.05c.47-.9 1.62-1.85 3.33-1.85 3.56 0 4.22 2.34 4.22 5.39v6.35zM5.34 7.44a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
-      <span>/in/gongtiejing</span>
-    </a>
-    <div>|</div>
-    <a href="https://github.com/enxpower/mining" target="_blank" rel="noopener" title="GitHub">
-      <svg class="iconsvg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#111" d="M12 .5A11.5 11.5 0 0 0 .5 12.3c0 5.2 3.4 9.6 8 11.2.6.1.8-.2.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.6-1.4-2-1.4-2-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 3 1.3 3.8 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.4-1.3-5.4-6a4.6 4.6 0 0 1 1.2-3.2c-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.2 11.2 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.9.1 3.2a4.6 4.6 0 0 1 1.2 3.2c0 4.7-2.8 5.7-5.4 6 .4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.6-1.6 8-6 8-11.2A11.5 11.5 0 0 0 12 .5z"/></svg>
-      <span>enxpower/mining</span>
-    </a>
-  </footer>
+<div class="topbar">
+  <h1><span data-i18n="title">Off-Grid Mining Microgrid — 35 kV</span> · <span class="kv">V2.4_geo</span></h1>
+  <button id="langBtn" class="langbtn">EN | 中文</button>
 </div>
+
+<!-- Global & Geo -->
+<div class="row">
+  <div class="card">
+    <b data-i18n="global">Global</b>
+    <label><span data-i18n="simHours">Simulation length (hours)</span></label><input id="simHours" type="number" value="24" step="1" min="1">
+    <label><span data-i18n="dt">Time step dt (s)</span></label><input id="dt" type="number" value="0.5" step="0.1" min="0.05">
+    <label><span data-i18n="f0">Nominal frequency f0 (Hz)</span></label><input id="f0" type="number" value="60" step="1" min="40" max="65">
+    <label><span data-i18n="Dsys">System damping D (pu)</span></label><input id="Dsys" type="number" value="2.2" step="0.1">
+    <label><span data-i18n="alphaLoad">Load freq-sensitivity α (%/Hz)</span></label><input id="alphaLoad" type="number" value="2.0" step="0.1">
+    <div style="margin-top:8px">
+      <button class="btn" id="startBtn" data-i18n="start">▶ Start</button>
+      <button class="btn secondary" id="pauseBtn" data-i18n="pause">⏸ Pause</button>
+      <button class="btn secondary" id="resetBtn" data-i18n="reset">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <b data-i18n="geo">Geography / Insolation</b>
+    <label><span data-i18n="preset">Preset</span></label>
+    <select id="geoPreset">
+      <option value="custom" selected data-i18n="custom">Custom</option>
+      <option value="arctic" data-i18n="arctic">Arctic (φ≈70°N)</option>
+      <option value="desert" data-i18n="desert">Desert (φ≈25°N)</option>
+      <option value="africa" data-i18n="africa">Tropical Africa (φ≈10°N)</option>
+      <option value="andes" data-i18n="andes">Andes (φ≈20°S)</option>
+    </select>
+    <label><span data-i18n="lat">Latitude φ (°)</span></label><input id="latDeg" type="number" value="25" step="0.5" min="-75" max="75">
+    <label><span data-i18n="doy">Day-of-year (1–365)</span></label><input id="doy" type="number" value="172" step="1" min="1" max="365">
+    <label><span data-i18n="pvSoil">PV soiling (0.7–1)</span></label><input id="pvSoil" type="number" value="0.9" step="0.01" min="0.7" max="1">
+  </div>
+
+  <div class="card">
+    <b data-i18n="load_ren">Load / Renewables (0 to disable)</b>
+    <label><span data-i18n="Pload">Load baseline (MW)</span></label><input id="Pload" type="number" value="12" step="0.5" min="0">
+    <label><span data-i18n="loadVar">Load variation (MW)</span></label><input id="loadVar" type="number" value="1.2" step="0.2" min="0">
+    <hr>
+    <label><span data-i18n="PpvMax">PV max (MW)</span></label><input id="PpvMax" type="number" value="30" step="1" min="0">
+    <label><span data-i18n="pvShape">PV day-shape (1–3)</span></label><input id="pvShape" type="number" value="1.5" step="0.1" min="1" max="3">
+    <label><span data-i18n="pvCloud">Cloudiness (0–1)</span></label><input id="pvCloud" type="number" value="0.35" step="0.05" min="0" max="1">
+    <hr>
+    <label><span data-i18n="PwindMax">Wind max (MW)</span></label><input id="PwindMax" type="number" value="6" step="1" min="0">
+    <label><span data-i18n="windMean">Mean wind speed (m/s)</span></label><input id="windMean" type="number" value="8" step="0.5" min="0">
+    <label><span data-i18n="windVar">Wind variability (0–1)</span></label><input id="windVar" type="number" value="0.4" step="0.05" min="0" max="1">
+  </div>
+
+  <div class="card">
+    <b data-i18n="diesel">Diesel (VF)</b>
+    <label><span data-i18n="dg33n">3.3MW initial on-line (0–6)</span></label><input id="dg33n" type="number" value="3" step="1" min="0" max="6">
+    <label><span data-i18n="dg12n">1.25MW initial on-line (0–2)</span></label><input id="dg12n" type="number" value="0" step="1" min="0" max="2">
+    <label><span data-i18n="Rdg">Active power droop R<sub>P</sub> (%)</span></label><input id="Rdg" type="number" value="4" step="0.5">
+    <label><span data-i18n="dgMinPu">Per-unit min load</span></label><input id="dgMinPu" type="number" value="0.35" step="0.05">
+    <label><span data-i18n="rampUp">Ramp up (MW/s)</span></label><input id="rampUp" type="number" value="0.2" step="0.05">
+    <label><span data-i18n="rampDn">Ramp down (MW/s)</span></label><input id="rampDn" type="number" value="1.0" step="0.1">
+    <label><span data-i18n="dgDelay">Start/stop delay (s)</span></label><input id="dgDelay" type="number" value="600" step="30">
+    <label><span data-i18n="dgHyst">Start/stop hysteresis (MW)</span></label><input id="dgHyst" type="number" value="1.5" step="0.1">
+    <label><span data-i18n="allowOff">Allow all-off</span></label>
+    <select id="allowDieselOff"><option value="false" selected data-i18n="no">No (keep ≥1 online)</option><option value="true" data-i18n="yes">Yes</option></select>
+  </div>
+
+  <div class="card">
+    <b data-i18n="bess">BESS (VSG)</b>
+    <label><span>P<sub>max</sub> (MW)</span></label><input id="PbMax" type="number" value="8" step="0.5" min="0">
+    <label><span>E<sub>max</sub> (MWh)</span></label><input id="EbMax" type="number" value="20" step="1" min="0">
+    <label><span data-i18n="soc0">Initial SOC (%)</span></label><input id="soc0" type="number" value="60" step="1" min="0" max="100">
+    <label><span data-i18n="Rvsg">Droop R<sub>P</sub> (%)</span></label><input id="Rvsg" type="number" value="3" step="0.5">
+    <label><span data-i18n="Hvsg">Virtual inertia H (s)</span></label><input id="Hvsg" type="number" value="6.0" step="0.1">
+    <label><span data-i18n="socTarget">SOC target / band (% / %)</span></label>
+    <div class="row" style="gap:8px"><input id="socTarget" type="number" value="55"><input id="socBand" type="number" value="10"></div>
+    <label><span data-i18n="emg">Emergency: |Δf| / overload× / window (Hz / × / s)</span></label>
+    <div class="row" style="gap:8px"><input id="femg" type="number" value="0.2" step="0.05"><input id="overMul" type="number" value="1.4" step="0.1"><input id="overSec" type="number" value="8" step="1"></div>
+  </div>
+
+  <div class="card">
+    <b data-i18n="prot">Protection / Limiting</b>
+    <label><span data-i18n="rocMax">RoCoF max (Hz/s)</span></label><input id="rocMax" type="number" value="0.9" step="0.1">
+    <label><span data-i18n="hzw">Hz–W limit: k1(60.2–60.5)/k2(&gt;60.5)</span></label>
+    <div class="row" style="gap:8px"><input id="kof1" type="number" value="0.5" step="0.1"><input id="kof2" type="number" value="2.0" step="0.1"></div>
+    <label><span>OF1 thresh (Hz)/time (s)</span></label>
+    <div class="row" style="gap:8px"><input id="of1f" type="number" value="60.5" step="0.1"><input id="of1t" type="number" value="10" step="1"></div>
+    <label><span>OF2 thresh (Hz)/time (s)</span></label>
+    <div class="row" style="gap:8px"><input id="of2f" type="number" value="61.0" step="0.1"><input id="of2t" type="number" value="0.2" step="0.1"></div>
+    <label><span data-i18n="reclose">Reclose after trip (s)</span></label><input id="reclose" type="number" value="30" step="1">
+  </div>
+</div>
+
+<!-- Window control -->
+<div class="row">
+  <div class="card" style="flex:1 1 420px">
+    <b data-i18n="view">Window control (draggable)</b>
+    <label><span data-i18n="viewHours">Window length (hours)</span></label><input id="viewHours" type="number" value="4" step="0.5" min="0.5">
+    <label><span data-i18n="viewStart">Window start (hours)</span></label><input id="viewStart" type="range" min="0" max="20" step="0.1" value="0">
+    <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+      <label style="display:flex;align-items:center;gap:6px"><input id="followLive" type="checkbox" checked> <span data-i18n="followLive">Follow live</span></label>
+      <span class="kv" id="viewLabel">[0.0, 4.0] h</span>
+    </div>
+  </div>
+</div>
+
+<!-- Plots -->
+<div class="row">
+  <div class="card stack" style="flex:2 1 560px">
+    <b data-i18n="powerPlot">Power (MW) · Window</b>
+    <div class="legend">
+      <div class="legend-row"><div class="swatch" style="background:#E69F00"></div><span data-i18n="leg_pv">PV</span></div>
+      <div class="legend-row"><div class="swatch dash2" style="background-image:linear-gradient(90deg,#D55E00 0 30%,transparent 30% 55%,#D55E00 55% 100%)"></div><span data-i18n="leg_wind">Wind</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#374151"></div><span data-i18n="leg_load">Load</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#0072B2"></div><span data-i18n="leg_diesel">Diesel</span></div>
+      <div class="legend-row"><div class="swatch dash" style="background-image:linear-gradient(90deg,#009E73 0 40%,transparent 40% 60%,#009E73 60% 100%)"></div><span data-i18n="leg_bess">BESS (+dis/−ch)</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#f59e0b;height:8px;width:8px;border-radius:50%"></div><span data-i18n="leg_sun">Sunrise/Sunset</span></div>
+    </div>
+    <canvas id="pPlot"></canvas>
+  </div>
+  <div class="card stack" style="flex:1 1 340px">
+    <b data-i18n="freqPlot">Frequency (Hz) / SOC (%) · Window</b>
+    <div class="legend">
+      <div class="legend-row"><div class="swatch" style="background:#6A3D9A"></div><span data-i18n="leg_freq">Freq</span></div>
+      <div class="legend-row"><div class="swatch dash" style="background-image:linear-gradient(90deg,#009E73 0 40%,transparent 40% 60%,#009E73 60% 100%)"></div><span data-i18n="leg_soc">SOC</span></div>
+      <div class="legend-row"><div class="swatch" style="background:#9ca3af;height:2px;width:18px"></div><span data-i18n="leg_f0">f₀=60 Hz baseline</span></div>
+    </div>
+    <canvas id="fPlot"></canvas>
+    <div id="live" class="kv" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- KPI & Log -->
+<div class="card">
+  <b data-i18n="metrics">Metrics & Log</b>
+  <div class="kpi" id="kpiRow">
+    <div class="box"><b data-i18n="kpiFuel">Fuel use</b><span id="kpiFuel">0 L</span></div>
+    <div class="box"><b data-i18n="kpiFuelBase">Fuel (diesel baseline)</b><span id="kpiFuelBase">0 L</span></div>
+    <div class="box"><b data-i18n="kpiFuelSave">Fuel saved</b><span id="kpiFuelSave">0 L</span></div>
+    <div class="box"><b data-i18n="kpiRE">Renewables share</b><span id="kpiRE">0%</span></div>
+    <div class="box"><b data-i18n="kpiPVgen">PV energy</b><span id="kpiPVgen">0 MWh</span></div>
+    <div class="box"><b data-i18n="kpiWDgen">Wind energy</b><span id="kpiWDgen">0 MWh</span></div>
+    <div class="box"><b data-i18n="kpiCurt">Curtailment (PV+Wind)</b><span id="kpiCurt">0 MWh</span></div>
+    <div class="box"><b data-i18n="kpiN1">N−1 check</b><span id="kpiN1">OK</span></div>
+    <div class="box"><b data-i18n="kpiWin">Recent window</b><span id="kpiWin">—</span></div>
+  </div>
+  <div id="log"></div>
+</div>
+
+<footer>
+  <div>© <span data-i18n="foot">Microgrid EMS Sim · V2.4_geo</span></div>
+  <div>|</div>
+  <a href="https://www.linkedin.com/in/gongtiejing" target="_blank" rel="noopener" title="LinkedIn">
+    <svg class="iconsvg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0A66C2" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.95v5.66H9.36V9h3.41v1.56h.05c.47-.9 1.62-1.85 3.33-1.85 3.56 0 4.22 2.34 4.22 5.39v6.35zM5.34 7.44a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>
+    <span>/in/gongtiejing</span>
+  </a>
+  <div>|</div>
+  <a href="https://github.com/enxpower/mining" target="_blank" rel="noopener" title="GitHub">
+    <svg class="iconsvg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#111" d="M12 .5A11.5 11.5 0 0 0 .5 12.3c0 5.2 3.4 9.6 8 11.2.6.1.8-.2.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.6-1.4-2-1.4-2-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 3 1.3 3.8 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.4-1.3-5.4-6a4.6 4.6 0 0 1 1.2-3.2c-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.2 11.2 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.9.1 3.2a4.6 4.6 0 0 1 1.2 3.2c0 4.7-2.8 5.7-5.4 6 .4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.6-1.6 8-6 8-11.2A11.5 11.5 0 0 0 12 .5z"/></svg>
+    <span>enxpower/mining</span>
+  </a>
+</footer>
 
 <script>
 (function(){
 /* ────────── i18n ────────── */
 const i18n = {
-  en: {
-    title:"Off-Grid Mining Microgrid — 35 kV",
-    global:"Global", simHours:"Simulation length (hours)", dt:"Time step dt (s)", f0:"Nominal frequency f0 (Hz)", Dsys:"System damping D (pu)", alphaLoad:"Load freq-sensitivity α (%/Hz)",
-    start:"▶ Start", pause:"⏸ Pause", reset:"↺ Reset",
-    geo:"Geography / Insolation", preset:"Preset", custom:"Custom", arctic:"Arctic (φ≈70°N)", desert:"Desert (φ≈25°N)", africa:"Tropical Africa (φ≈10°N)", andes:"Andes (φ≈20°S)",
-    lat:"Latitude φ (°)", doy:"Day-of-year (1–365)", pvSoil:"PV soiling (0.7–1)",
-    load_ren:"Load / Renewables (0 to disable)", Pload:"Load baseline (MW)", loadVar:"Load variation (MW)",
-    PpvMax:"PV max (MW)", pvShape:"PV day-shape (1–3)", pvCloud:"Cloudiness (0–1)",
-    PwindMax:"Wind max (MW)", windMean:"Mean wind speed (m/s)", windVar:"Wind variability (0–1)",
-    diesel:"Diesel (VF)", dg33n:"3.3MW initial on-line (0–6)", dg12n:"1.25MW initial on-line (0–2)", Rdg:"Active power droop R\u209A (%)", dgMinPu:"Per-unit min load", rampUp:"Ramp up (MW/s)", rampDn:"Ramp down (MW/s)", dgDelay:"Start/stop delay (s)", dgHyst:"Start/stop hysteresis (MW)", allowOff:"Allow all-off", yes:"Yes", no:"No (keep ≥1 online)",
-    bess:"BESS (VSG)", soc0:"Initial SOC (%)", Rvsg:"Droop R\u209A (%)", Hvsg:"Virtual inertia H (s)", socTarget:"SOC target / band (% / %)", emg:"Emergency: |Δf| / overload× / window (Hz / × / s)",
-    prot:"Protection / Limiting", rocMax:"RoCoF max (Hz/s)", hzw:"Hz–W limit: k1(60.2–60.5)/k2(>60.5)", reclose:"Reclose after trip (s)",
-    view:"Window control (draggable)", viewHours:"Window length (hours)", viewStart:"Window start (hours)", followLive:"Follow live",
-    powerPlot:"Power (MW) · Window", freqPlot:"Frequency (Hz) / SOC (%) · Window",
-    leg_pv:"PV", leg_wind:"Wind", leg_load:"Load", leg_diesel:"Diesel", leg_bess:"BESS (+dis/−ch)", leg_sun:"Sunrise/Sunset", leg_freq:"Freq", leg_soc:"SOC", leg_f0:"f₀=60 Hz baseline",
-    metrics:"Metrics & Log", kpiFuel:"Fuel use", kpiFuelBase:"Fuel (diesel baseline)", kpiFuelSave:"Fuel saved", kpiRE:"Renewables share", kpiPVgen:"PV energy", kpiWDgen:"Wind energy", kpiCurt:"Curtailment (PV+Wind)", kpiN1:"N−1 check", kpiWin:"Recent window",
-    foot:"Microgrid EMS Sim · V2.4_geo",
-    live_tpl:"t={t} h | f={f} Hz | Δf={df} Hz | PV={pv} MW | Wind={wind} MW | Diesel={diesel} MW | BESS={bess} MW | SOC={soc}% | Load={load} MW",
-    tag_60hz:"60 Hz"
-  },
-  zh: {
-    title:"离网矿区微电网 — 35 kV",
-    global:"全局", simHours:"仿真时长（小时）", dt:"步长 dt（秒）", f0:"名义频率 f0（Hz）", Dsys:"系统阻尼 D（pu）", alphaLoad:"负荷随频 α（%/Hz）",
-    start:"▶ 开始", pause:"⏸ 暂停", reset:"↺ 重置",
-    geo:"地理/日照", preset:"预设", custom:"自定义", arctic:"极寒（φ≈70°N）", desert:"沙漠（φ≈25°N）", africa:"非洲热带（φ≈10°N）", andes:"安第斯（φ≈20°S）",
-    lat:"纬度 φ（°）", doy:"年内日序（1–365）", pvSoil:"PV 污染/积尘（0.7–1）",
-    load_ren:"负载 / 可再生（设 0 即无）", Pload:"负载基线（MW）", loadVar:"负载波动幅度（MW）",
-    PpvMax:"PV 上限（MW）", pvShape:"PV 日形（1–3）", pvCloud:"云影强度（0–1）",
-    PwindMax:"风电上限（MW）", windMean:"平均风速（m/s）", windVar:"风速波动（0–1）",
-    diesel:"柴油（VF）", dg33n:"3.3MW 初始在网（0–6）", dg12n:"1.25MW 初始在网（0–2）", Rdg:"有功下垂 R\u209A（%）", dgMinPu:"单台最低负载（pu）", rampUp:"上调爬坡（MW/s）", rampDn:"下调爬坡（MW/s）", dgDelay:"启停延时（s）", dgHyst:"启停迟滞（MW）", allowOff:"允许全停", yes:"是", no:"否（至少1台在线）",
-    bess:"BESS（VSG）", soc0:"初始 SOC（%）", Rvsg:"下垂 R\u209A（%）", Hvsg:"虚拟惯量 H（s）", socTarget:"SOC 目标 / 窗口（% / %）", emg:"应急：|Δf| / 过载倍数 / 时间窗（Hz / × / s）",
-    prot:"保护/限功", rocMax:"RoCoF 限值（Hz/s）", hzw:"Hz–W 限功：k1(60.2–60.5)/k2(>60.5)", reclose:"跳闸后重合闸（s）",
-    view:"视窗控制（可滑动）", viewHours:"视窗长度（小时）", viewStart:"视窗起点（小时）", followLive:"跟随实时",
-    powerPlot:"功率（MW） · 视窗", freqPlot:"频率（Hz）/ SOC（%） · 视窗",
-    leg_pv:"PV", leg_wind:"Wind", leg_load:"Load", leg_diesel:"Diesel", leg_bess:"BESS（+放/−充）", leg_sun:"日出/日落", leg_freq:"Freq", leg_soc:"SOC", leg_f0:"f₀=60 Hz 基线",
-    metrics:"指标 & 日志", kpiFuel:"燃油消耗", kpiFuelBase:"燃油对照（全柴油）", kpiFuelSave:"燃油节省", kpiRE:"可再生占比", kpiPVgen:"PV 发电量", kpiWDgen:"Wind 发电量", kpiCurt:"弃电（PV+风）", kpiN1:"N−1 校核", kpiWin:"最近窗口",
-    foot:"Microgrid EMS Sim · V2.4_geo",
-    live_tpl:"t={t} 小时 | 频率={f} Hz | Δf={df} Hz | PV={pv} MW | 风电={wind} MW | 柴油={diesel} MW | BESS={bess} MW | SOC={soc}% | 负荷={load} MW",
-    tag_60hz:"60 Hz"
-  }
+  en: { title:"Off-Grid Mining Microgrid — 35 kV", global:"Global", simHours:"Simulation length (hours)", dt:"Time step dt (s)", f0:"Nominal frequency f0 (Hz)", Dsys:"System damping D (pu)", alphaLoad:"Load freq-sensitivity α (%/Hz)", start:"▶ Start", pause:"⏸ Pause", reset:"↺ Reset", geo:"Geography / Insolation", preset:"Preset", custom:"Custom", arctic:"Arctic (φ≈70°N)", desert:"Desert (φ≈25°N)", africa:"Tropical Africa (φ≈10°N)", andes:"Andes (φ≈20°S)", lat:"Latitude φ (°)", doy:"Day-of-year (1–365)", pvSoil:"PV soiling (0.7–1)", load_ren:"Load / Renewables (0 to disable)", Pload:"Load baseline (MW)", loadVar:"Load variation (MW)", PpvMax:"PV max (MW)", pvShape:"PV day-shape (1–3)", pvCloud:"Cloudiness (0–1)", PwindMax:"Wind max (MW)", windMean:"Mean wind speed (m/s)", windVar:"Wind variability (0–1)", diesel:"Diesel (VF)", dg33n:"3.3MW initial on-line (0–6)", dg12n:"1.25MW initial on-line (0–2)", Rdg:"Active power droop R\u209A (%)", dgMinPu:"Per-unit min load", rampUp:"Ramp up (MW/s)", rampDn:"Ramp down (MW/s)", dgDelay:"Start/stop delay (s)", dgHyst:"Start/stop hysteresis (MW)", allowOff:"Allow all-off", yes:"Yes", no:"No (keep ≥1 online)", bess:"BESS (VSG)", soc0:"Initial SOC (%)", Rvsg:"Droop R\u209A (%)", Hvsg:"Virtual inertia H (s)", socTarget:"SOC target / band (% / %)", emg:"Emergency: |Δf| / overload× / window (Hz / × / s)", prot:"Protection / Limiting", rocMax:"RoCoF max (Hz/s)", hzw:"Hz–W limit: k1(60.2–60.5)/k2(>60.5)", reclose:"Reclose after trip (s)", view:"Window control (draggable)", viewHours:"Window length (hours)", viewStart:"Window start (hours)", followLive:"Follow live", powerPlot:"Power (MW) · Window", freqPlot:"Frequency (Hz) / SOC (%) · Window", leg_pv:"PV", leg_wind:"Wind", leg_load:"Load", leg_diesel:"Diesel", leg_bess:"BESS (+dis/−ch)", leg_sun:"Sunrise/Sunset", leg_freq:"Freq", leg_soc:"SOC", leg_f0:"f₀=60 Hz baseline", metrics:"Metrics & Log", kpiFuel:"Fuel use", kpiFuelBase:"Fuel (diesel baseline)", kpiFuelSave:"Fuel saved", kpiRE:"Renewables share", kpiPVgen:"PV energy", kpiWDgen:"Wind energy", kpiCurt:"Curtailment (PV+Wind)", kpiN1:"N−1 check", kpiWin:"Recent window", foot:"Microgrid EMS Sim · V2.4_geo" },
+  zh: { title:"离网矿区微电网 — 35 kV", global:"全局", simHours:"仿真时长（小时）", dt:"步长 dt（秒）", f0:"名义频率 f0（Hz）", Dsys:"系统阻尼 D（pu）", alphaLoad:"负荷随频 α（%/Hz）", start:"▶ 开始", pause:"⏸ 暂停", reset:"↺ 重置", geo:"地理/日照", preset:"预设", custom:"自定义", arctic:"极寒（φ≈70°N）", desert:"沙漠（φ≈25°N）", africa:"非洲热带（φ≈10°N）", andes:"安第斯（φ≈20°S）", lat:"纬度 φ（°）", doy:"年内日序（1–365）", pvSoil:"PV 污染/积尘（0.7–1）", load_ren:"负载 / 可再生（设 0 即无）", Pload:"负载基线（MW）", loadVar:"负载波动幅度（MW）", PpvMax:"PV 上限（MW）", pvShape:"PV 日形（1–3）", pvCloud:"云影强度（0–1）", PwindMax:"风电上限（MW）", windMean:"平均风速（m/s）", windVar:"风速波动（0–1）", diesel:"柴油（VF）", dg33n:"3.3MW 初始在网（0–6）", dg12n:"1.25MW 初始在网（0–2）", Rdg:"有功下垂 R\u209A（%）", dgMinPu:"单台最低负载（pu）", rampUp:"上调爬坡（MW/s）", rampDn:"下调爬坡（MW/s）", dgDelay:"启停延时（s）", dgHyst:"启停迟滞（MW）", allowOff:"允许全停", yes:"是", no:"否（至少1台在线）", bess:"BESS（VSG）", soc0:"初始 SOC（%）", Rvsg:"下垂 R\u209A（%）", Hvsg:"虚拟惯量 H（s）", socTarget:"SOC 目标 / 窗口（% / %）", emg:"应急：|Δf| / 过载倍数 / 时间窗（Hz / × / s）", prot:"保护/限功", rocMax:"RoCoF 限值（Hz/s）", hzw:"Hz–W 限功：k1(60.2–60.5)/k2(>60.5)", reclose:"跳闸后重合闸（s）", view:"视窗控制（可滑动）", viewHours:"视窗长度（小时）", viewStart:"视窗起点（小时）", followLive:"跟随实时", powerPlot:"功率（MW） · 视窗", freqPlot:"频率（Hz）/ SOC（%） · 视窗", leg_pv:"PV", leg_wind:"Wind", leg_load:"Load", leg_diesel:"Diesel", leg_bess:"BESS（+放/−充）", leg_sun:"日出/日落", leg_freq:"Freq", leg_soc:"SOC", leg_f0:"f₀=60 Hz 基线", metrics:"指标 & 日志", kpiFuel:"燃油消耗", kpiFuelBase:"燃油对照（全柴油）", kpiFuelSave:"燃油节省", kpiRE:"可再生占比", kpiPVgen:"PV 发电量", kpiWDgen:"Wind 发电量", kpiCurt:"弃电（PV+风）", kpiN1:"N−1 校核", kpiWin:"最近窗口", foot:"Microgrid EMS Sim · V2.4_geo" }
 };
 let currentLang='en';
 function applyI18n(){
@@ -318,8 +231,7 @@ function ts(t){const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=Math.floor
 const COLORS={ pv:'#E69F00', wind:'#D55E00', load:'#374151', diesel:'#0072B2', bess:'#009E73', freq:'#6A3D9A' };
 
 /* ────────── DOM ────────── */
-const E={
-  simHours:el('simHours'), dt:el('dt'), f0:el('f0'), Dsys:el('Dsys'), alphaLoad:el('alphaLoad'),
+const E={ simHours:el('simHours'), dt:el('dt'), f0:el('f0'), Dsys:el('Dsys'), alphaLoad:el('alphaLoad'),
   geoPreset:el('geoPreset'), latDeg:el('latDeg'), doy:el('doy'), pvSoil:el('pvSoil'),
   Pload:el('Pload'), loadVar:el('loadVar'),
   PpvMax:el('PpvMax'), pvShape:el('pvShape'), pvCloud:el('pvCloud'),
@@ -553,7 +465,7 @@ function step(){
   let remain=Pload, pv2L=Math.min(Ppv,remain); remain-=pv2L;
   let wind2L=Math.min(Pwind,remain); remain-=wind2L;
 
-  // 可再生直供
+  // 可再生“直供负荷”的能量（用于占比）
   st.pvDir   += pv2L   * dt/3600;
   st.windDir += wind2L * dt/3600;
 
@@ -570,7 +482,7 @@ function step(){
   st.E_load += Pload*dt/3600;
   st.fuelL  += fuelLH(st.dg.fleet)*dt/3600;
 
-  // 全柴油基线
+  // 对照：全柴油最优近似的 L/h
   const Lh_base = baselineFuelLitersPerHour(Pload);
   st.fuelBaselineL += Lh_base * dt/3600;
 
@@ -596,13 +508,11 @@ function updateViewLabel(){
 }
 
 /* ────────── 绘图 ────────── */
-function drawSeries(ctx,w,h,xs,ys,color,dashed=false,width=2.4){
+function drawSeries(ctx,w,h,xs,ys,color,dashed=false,width=2.5){
   ctx.beginPath(); if(dashed) ctx.setLineDash([6,6]); else ctx.setLineDash([]);
   for(let i=0;i<xs.length;i++){ if(i===0) ctx.moveTo(xs[i],ys[i]); else ctx.lineTo(xs[i],ys[i]); }
   ctx.strokeStyle=color; ctx.lineWidth=width; ctx.stroke(); ctx.setLineDash([]);
 }
-function drawGrid(ctx,w,h){ ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--line').trim()||'#f3f4f6'; ctx.lineWidth=1;
-  for(let i=0;i<5;i++){const yy=(i/4)*(h-36)+18; ctx.beginPath(); ctx.moveTo(40,yy); ctx.lineTo(w-12,yy); ctx.stroke();}}
 function drawSunMarkers(ctx,w,h,t0,t1){
   const {rise,set}=sunTimes(st.lat,st.doy); const sr=rise*3600, ss=set*3600;
   const sx=t=>40+((t-t0)/(t1-t0))*(w-60);
@@ -622,10 +532,9 @@ function plotPower(ws){
   const allP=seg.flatMap(d=>[d.Ppv,d.Pwind,d.Pload,d.Pdg,d.Pb]);
   const pmin=Math.min(0,...allP), pmax=Math.max(...allP,1);
   const y=v=>(1-(v-pmin)/(pmax-pmin||1))*(h-36)+18;
-
-  drawGrid(ctx,w,h);
+  ctx.strokeStyle='#f3f4f6'; ctx.lineWidth=1;
+  for(let i=0;i<5;i++){const yy=(i/4)*(h-36)+18; ctx.beginPath(); ctx.moveTo(40,yy); ctx.lineTo(w-12,yy); ctx.stroke();}
   const y0=y(0); ctx.beginPath(); ctx.moveTo(40,y0); ctx.lineTo(w-12,y0); ctx.setLineDash([5,5]); ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
-
   const segMap=k=>seg.map(d=>y(d[k]));
   drawSeries(ctx,w,h,xs,segMap('Ppv'),COLORS.pv);
   drawSeries(ctx,w,h,xs,segMap('Pwind'),COLORS.wind,true);
@@ -633,8 +542,7 @@ function plotPower(ws){
   drawSeries(ctx,w,h,xs,segMap('Pdg'),COLORS.diesel);
   drawSeries(ctx,w,h,xs,segMap('Pb'),COLORS.bess);
   drawSunMarkers(ctx,w,h,t0,t1);
-
-  ctx.fillStyle:'#374151'; ctx.font=`${11*DPR}px sans-serif`;
+  ctx.fillStyle='#374151'; ctx.font=`${11*DPR}px sans-serif`;
   for(let k=0;k<=ticks;k++){const tk=t0+(k/ticks)*(t1-t0),x=40+(k/ticks)*(w-60);ctx.fillText(`${(tk/3600).toFixed(1)}h`,x-14,h-6);}
 }
 function plotFreq(ws){
@@ -648,30 +556,14 @@ function plotFreq(ws){
   let fmin=Math.min(...fVals,f0-0.8), fmax=Math.max(...fVals,f0+0.8);
   if(!isFinite(fmin)||!isFinite(fmax)||fmax-fmin<0.1){ fmin=f0-0.8; fmax=f0+0.8; }
   const yF=v=>(1-(v-fmin)/(fmax-fmin||1))*(h-36)+18; const yS=v=>(1-(v-0)/(100-0||1))*(h-36)+18;
-
-  drawGrid(ctx,w,h);
-
+  ctx.strokeStyle='#f3f4f6'; ctx.lineWidth=1; for(let i=0;i<5;i++){const yy=(i/4)*(h-36)+18; ctx.beginPath(); ctx.moveTo(40,yy); ctx.lineTo(w-12,yy); ctx.stroke();}
   const y60=yF(f0); ctx.beginPath(); ctx.moveTo(40,y60); ctx.lineTo(w-12,y60); ctx.setLineDash([]); ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1; ctx.stroke();
-  ctx.fillStyle:'#6b7280'; ctx.font=`${10*DPR}px sans-serif`; ctx.fillText(i18n[currentLang].tag_60hz, 44, y60-4);
-
+  ctx.fillStyle='#6b7280'; ctx.font=`${10*DPR}px sans-serif`; ctx.fillText('60 Hz', 44, y60-4);
   drawSeries(ctx,w,h,xs,fVals.map(yF),COLORS.freq);
   drawSeries(ctx,w,h,xs,sVals.map(yS),'#009E73',true);
-
-  const last=series[series.length-1];
-  const df = last.f - st.f0;
-  const tpl = i18n[currentLang].live_tpl;
-  E.live.textContent = tpl
-    .replace('{t}', (last.t/3600).toFixed(2))
-    .replace('{f}', last.f.toFixed(3))
-    .replace('{df}', (df>=0?'+':'')+df.toFixed(3))
-    .replace('{pv}', last.Ppv.toFixed(2))
-    .replace('{wind}', last.Pwind.toFixed(2))
-    .replace('{diesel}', last.Pdg.toFixed(2))
-    .replace('{bess}', last.Pb.toFixed(2))
-    .replace('{soc}', last.soc.toFixed(1))
-    .replace('{load}', last.Pload.toFixed(2));
-
-  ctx.fillStyle:'#374151'; ctx.font=`${11*DPR}px sans-serif`;
+  const last=series[series.length-1]; const df = last.f - st.f0;
+  E.live.textContent=`t=${(last.t/3600).toFixed(2)} h | f=${last.f.toFixed(3)} Hz | Δf=${(df>=0?'+':'')}${df.toFixed(3)} Hz | PV=${last.Ppv.toFixed(2)} MW | Wind=${last.Pwind.toFixed(2)} MW | Diesel=${last.Pdg.toFixed(2)} MW | BESS=${last.Pb.toFixed(2)} MW | SOC=${last.soc.toFixed(1)}% | Load=${last.Pload.toFixed(2)} MW`;
+  ctx.fillStyle='#374151'; ctx.font=`${11*DPR}px sans-serif`;
   for(let k=0;k<=ticks;k++){const tk=t0+(k/ticks)*(t1-t0),x=40+(k/ticks)*(w-60);ctx.fillText(`${(tk/3600).toFixed(1)}h`,x-14,h-6);}
   if(seg.length>2){
     const fmaxSeg=Math.max(...seg.map(d=>d.f));
@@ -696,7 +588,7 @@ function refreshKPI(){
 function loop(){
   if(!running) return;
   step();
-  windowState = computeWindow();   // ✅ 共享窗口一次计算 → 两图严格对齐
+  windowState = computeWindow();   // ✅ 共享窗口一次计算
   plotPower(windowState);
   plotFreq(windowState);
   refreshKPI();

@@ -326,13 +326,21 @@ function sunTimes(latRad,doy){
   if(x<=-1)return{day:24,rise:0,set:24};if(x>=1)return{day:0,rise:12,set:12};
   const ω=Math.acos(x);const day=24*ω/Math.PI;const rise=12-day/2,set=12+day/2;return{day,rise,set};
 }
-function loadPower(t,f,f0){
-  const base=st.load.base;
-  const cyc=0.6*st.load.var*Math.sin(2*Math.PI*t/900);
-  const mech=0.4*st.load.var*Math.sin(2*Math.PI*t/120);
-  const droop=(1-st.alpha*((f-f0)/f0));
-  return Math.max(0,(base+cyc+mech)*droop);
+function loadPower(t, f, f0){
+  const base = st.load.base;
+  const cyc  = 0.6*st.load.var*Math.sin(2*Math.PI*t/900);
+  const mech = 0.4*st.load.var*Math.sin(2*Math.PI*t/120);
+
+  // 关键修正：频率↑ -> 负荷↑（负反馈），而不是减负荷（正反馈）
+  const dfpu  = (f - f0) / f0;
+  let   droop = 1 + st.alpha * dfpu;
+
+  // 防止极端值（可保留/删除，主要是安全护栏）
+  droop = clamp(droop, 0.6, 1.4);
+
+  return Math.max(0, (base + cyc + mech) * droop);
 }
+
 function pvAvail(t){
   if(st.pv.Pmax<=0) return 0;
   const {rise,set}=sunTimes(st.lat,st.doy);const sr=rise*3600,ss=set*3600;
@@ -355,16 +363,48 @@ function windAvail(v){
   if(v<3) return 0;if(v<12){const pu=(v-3)/(12-3);return Pmax*pu*pu;}
   if(v<=25) return Pmax; if(st.wind.stopReset<=0){st.wind.stopReset=120;logLine(`${ts(st.t)} Wind cut-out`);} return 0;
 }
-function limitREByFreq(Pavail,res,dt){
-  const f=st.f;if(Pavail<=0) return 0;
-  if(res.ofTrip>0){res.ofTrip-=dt;return 0;}
-  if(f>=st.of2f){res.ofDelay=(res._band===2?res.ofDelay+dt:dt);res._band=2;if(res.ofDelay>=st.of2t){res.ofTrip=st.reclose;res.ofDelay=0;res._band=0;logLine(`${ts(st.t)} OF2 trip`);return 0;}}
-  else if(f>=st.of1f){res.ofDelay=(res._band===1?res.ofDelay+dt:dt);res._band=1;if(res.ofDelay>=st.of1t){res.ofTrip=st.reclose;res.ofDelay=0;res._band=0;logLine(`${ts(st.t)} OF1 trip`);return 0;}}
-  else {res.ofDelay=Math.max(0,res.ofDelay-2*dt);res._band=0;}
-  let scale=1; if(f>60.2){ if(f<60.5) scale=Math.max(0,1-st.kof1*(f-60.0));
-    else scale=Math.max(0,1-st.kof1*0.5-st.kof2*(f-60.5)); }
-  return Pavail*scale;
+function limitREByFreq(Pavail, res, dt){
+  const f = st.f;
+  if (Pavail <= 0) return 0;
+
+  // 若在跳闸重合闸等待期，直接 0
+  if (res.ofTrip > 0) { res.ofTrip -= dt; return 0; }
+
+  let scale = 1;  // 输出缩放因子，<=1
+
+  // —— 过频分段处理 ——
+  if (f >= st.of2f) {
+    // OF2：硬跳闸（保持你的策略）
+    res.ofDelay = (res._band === 2 ? res.ofDelay + dt : dt);
+    res._band = 2;
+    if (res.ofDelay >= st.of2t) {
+      res.ofTrip = st.reclose;  // 进入重合闸计时
+      res.ofDelay = 0; res._band = 0;
+      logLine(`${ts(st.t)} OF2 trip`);
+      return 0;
+    }
+  } else if (f >= st.of1f) {
+    // OF1：软限功（不跳闸，只把出力压到 20%）
+    res.ofDelay = (res._band === 1 ? res.ofDelay + dt : dt);
+    res._band = 1;
+    scale = Math.min(scale, 0.2);
+  } else {
+    // 恢复区：延时回落并清 band
+    res.ofDelay = Math.max(0, res.ofDelay - 2*dt);
+    res._band = 0;
+  }
+
+  // —— Hz–W 连续限功（保留你的算法，但与上面的软限取最小值）——
+  if (f > 60.2) {
+    let hzScale;
+    if (f < 60.5) hzScale = Math.max(0, 1 - st.kof1*(f - 60.0));
+    else          hzScale = Math.max(0, 1 - st.kof1*0.5 - st.kof2*(f - 60.5));
+    scale = Math.min(scale, hzScale);
+  }
+
+  return Pavail * scale;
 }
+
 function buildFleet(n33,n12){
   st.dg.fleet=[];for(let i=0;i<6;i++) st.dg.fleet.push(newDG(3.3,"DG3.3",i<n33));
   for(let i=0;i<2;i++) st.dg.fleet.push(newDG(1.25,"DG1.25",i<n12));
